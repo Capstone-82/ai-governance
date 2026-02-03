@@ -1,0 +1,1 @@
+{"provider": "aws_bedrock", "model_id": "us.meta.llama3-2-1b-instruct-v1:0", "latency_ms": 3200.35, "input_tokens": 12, "output_tokens": 149, "total_tokens": 161, "timestamp": "2026-02-01T08:03:10.798612+00:00", "success": true, "failure_classification": null, "error_message": null}
