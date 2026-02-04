@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { AnalyticsData } from '@/types/ai-platform';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
+  // AreaChart,
   BarChart,
   Bar,
   XAxis,
