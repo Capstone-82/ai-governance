@@ -1,0 +1,67 @@
+{
+  "provider": "Google Vertex AI",
+  "currency": "USD",
+  "pricing_unit": "per_1M_tokens",
+  "models": [
+    {
+      "model": "gemini-3-flash-preview",
+      "input": 0.075,
+      "output": 0.30,
+      "description": "Agentic workhorse model"
+    },
+    {
+      "model": "gemini-3-pro-image-preview",
+      "input": 1.25,
+      "output": 5.00,
+      "description": "Creative workflows with image generation"
+    },
+    {
+      "model": "gemini-3-pro-preview",
+      "input": 2.50,
+      "output": 10.00,
+      "description": "Most powerful agentic and coding model"
+    },
+    {
+      "model": "gemini-2.5-flash-lite-preview-09-2025",
+      "input": 0.0375,
+      "output": 0.15,
+      "description": "Low latency balanced model"
+    },
+    {
+      "model": "gemini-2.5-flash-preview-09-2025",
+      "input": 0.075,
+      "output": 0.30,
+      "description": "Strong performance and low latency"
+    },
+    {
+      "model": "gemini-2.5-flash-lite",
+      "input": 0.0375,
+      "output": 0.15,
+      "description": "Balanced low latency"
+    },
+    {
+      "model": "gemini-2.5-pro",
+      "input": 1.25,
+      "output": 5.00,
+      "description": "Strongest quality for code & complex prompts"
+    },
+    {
+      "model": "gemini-2.5-flash",
+      "input": 0.075,
+      "output": 0.30,
+      "description": "Best for balancing reasoning and speed"
+    },
+    {
+      "model": "gemini-1.5-pro",
+      "input": 1.25,
+      "output": 5.00,
+      "description": "Legacy pro model"
+    },
+    {
+      "model": "gemini-1.5-flash",
+      "input": 0.075,
+      "output": 0.30,
+      "description": "Legacy flash model"
+    }
+  ]
+}

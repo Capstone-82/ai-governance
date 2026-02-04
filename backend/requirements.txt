@@ -1,9 +1,12 @@
 fastapi
 uvicorn
+boto3
 pydantic
-openai
-anthropic
-google-generativeai
+pydantic-settings
 python-dotenv
 sqlmodel
 aiosqlite
+httpx
+pytest
+google-genai
+openai
