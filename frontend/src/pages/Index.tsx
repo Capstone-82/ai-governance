@@ -4,7 +4,7 @@ import { SessionSidebar } from '@/components/SessionSidebar';
 import { PromptInput } from '@/components/PromptInput';
 import { ResultsComparison } from '@/components/ResultsComparison';
 import { AnalyticsGraphs } from '@/components/AnalyticsGraphs';
-import { OverallAnalyticsDashboard } from '@/components/OverallAnalyticsDashboard';
+
 import { RecommendationsPanel } from '@/components/RecommendationsPanel';
 import { WelcomeScreen } from '@/components/WelcomeScreen';
 import { MessageHistory } from '@/components/MessageHistory';
@@ -12,7 +12,7 @@ import { useAIPlatform } from '@/hooks/useAIPlatform';
 import { ExecutionMode } from '@/types/ai-platform';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart3, Lightbulb, Layers, TrendingUp } from 'lucide-react';
+import { BarChart3, Lightbulb, Layers } from 'lucide-react';
 
 const Index = () => {
   const {
@@ -39,8 +39,8 @@ const Index = () => {
   ]);
 
   const handleSelectModel = (modelId: string) => {
-    setSelectedModels(prev => 
-      prev.includes(modelId) 
+    setSelectedModels(prev =>
+      prev.includes(modelId)
         ? prev.filter(id => id !== modelId)
         : [...prev, modelId]
     );
@@ -98,27 +98,10 @@ const Index = () => {
         {/* Top Bar */}
         <header className="h-14 border-b border-border bg-card/50 backdrop-blur-sm flex items-center justify-between px-6 shrink-0">
           <div className="flex items-center gap-4">
-          <h2 className="font-semibold text-foreground">
+            <h2 className="font-semibold text-foreground">
               {currentSession ? currentSession.title : 'AI Cloud Governance'}
             </h2>
-            {currentSession && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span className="px-2 py-0.5 rounded bg-muted">
-                  {currentSession.messages.filter(m => m.role === 'user').length} prompts
-                </span>
-                <span className="px-2 py-0.5 rounded bg-muted">
-                  ${currentSession.totalCost.toFixed(5)} spent
-                </span>
-                <span className="px-2 py-0.5 rounded bg-success/20 text-success text-xs">
-                  Analytics tracking
-                </span>
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="hidden md:inline">Press</span>
-            <kbd className="px-2 py-1 bg-muted rounded text-xs font-mono">⌘K</kbd>
-            <span className="hidden md:inline">for shortcuts</span>
+            {/* Removed session stats and shortcuts */}
           </div>
         </header>
 
@@ -160,65 +143,48 @@ const Index = () => {
 
                 {/* Results & Analytics */}
                 {latestRuns.length > 0 && (
-                  <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                    {/* Main Content - Results & Analytics */}
-                    <div className="xl:col-span-2 space-y-6">
-                      <Tabs defaultValue="results" className="w-full">
-                        <TabsList className="grid w-full max-w-lg grid-cols-4">
-                          <TabsTrigger value="results" className="flex items-center gap-2">
-                            <Layers className="w-4 h-4" />
-                            Results
-                          </TabsTrigger>
-                          <TabsTrigger value="analytics" className="flex items-center gap-2">
-                            <BarChart3 className="w-4 h-4" />
-                            Analytics
-                          </TabsTrigger>
-                          <TabsTrigger value="overall" className="flex items-center gap-2">
-                            <TrendingUp className="w-4 h-4" />
-                            Overall
-                          </TabsTrigger>
-                          <TabsTrigger value="insights" className="flex items-center gap-2 xl:hidden">
-                            <Lightbulb className="w-4 h-4" />
-                            Insights
-                          </TabsTrigger>
-                        </TabsList>
+                  <div className="space-y-6">
+                    <Tabs defaultValue="results" className="w-full">
+                      <TabsList className="grid w-full max-w-lg grid-cols-4">
+                        <TabsTrigger value="results" className="flex items-center gap-2">
+                          <Layers className="w-4 h-4" />
+                          Results
+                        </TabsTrigger>
+                        <TabsTrigger value="analytics" className="flex items-center gap-2">
+                          <BarChart3 className="w-4 h-4" />
+                          Analytics
+                        </TabsTrigger>
 
-                        <TabsContent value="results" className="mt-6">
-                          <ResultsComparison
-                            runs={latestRuns}
-                            recommendedModelId={speedRecommendation?.modelId}
-                            recommendationType={speedRecommendation?.title}
-                          />
-                        </TabsContent>
+                        <TabsTrigger value="insights" className="flex items-center gap-2">
+                          <Lightbulb className="w-4 h-4" />
+                          Insights
+                        </TabsTrigger>
+                      </TabsList>
 
-                        <TabsContent value="analytics" className="mt-6">
-                          {analytics && <AnalyticsGraphs data={analytics} />}
-                        </TabsContent>
+                      <TabsContent value="results" className="mt-6">
+                        <ResultsComparison
+                          runs={latestRuns}
+                          recommendedModelId={speedRecommendation?.modelId}
+                          recommendationType={speedRecommendation?.title}
+                        />
+                      </TabsContent>
 
-                        <TabsContent value="overall" className="mt-6">
-                          <OverallAnalyticsDashboard data={cumulativeAnalytics} />
-                        </TabsContent>
+                      <TabsContent value="analytics" className="mt-6">
+                        {analytics && <AnalyticsGraphs data={analytics} />}
+                      </TabsContent>
 
-                        <TabsContent value="insights" className="mt-6 xl:hidden">
-                          <RecommendationsPanel
-                            recommendations={recommendations}
-                            promptSuggestions={promptSuggestions}
-                            confidence={confidence}
-                            divergence={divergence}
-                          />
-                        </TabsContent>
-                      </Tabs>
-                    </div>
 
-                    {/* Sidebar - Recommendations (Desktop) */}
-                    <div className="hidden xl:block">
-                      <RecommendationsPanel
-                        recommendations={recommendations}
-                        promptSuggestions={promptSuggestions}
-                        confidence={confidence}
-                        divergence={divergence}
-                      />
-                    </div>
+
+                      <TabsContent value="insights" className="mt-6">
+                        <RecommendationsPanel
+                          recommendations={recommendations}
+                          promptSuggestions={promptSuggestions}
+                          confidence={confidence}
+                          divergence={divergence}
+                          analytics={analytics}
+                        />
+                      </TabsContent>
+                    </Tabs>
                   </div>
                 )}
 
@@ -236,7 +202,7 @@ const Index = () => {
                       Ready to Compare
                     </h3>
                     <p className="text-muted-foreground max-w-md mx-auto">
-                      Enter a prompt above and select the AI models you want to compare. 
+                      Enter a prompt above and select the AI models you want to compare.
                       Results will appear here with detailed analytics.
                     </p>
                   </motion.div>
@@ -246,7 +212,7 @@ const Index = () => {
           </AnimatePresence>
         </ScrollArea>
       </main>
-    </div>
+    </div >
   );
 };
 

@@ -30,7 +30,7 @@ export const generateMockCumulativeAnalytics = (): CumulativeAnalytics => {
     const weekStart = i * 7;
     const weekEnd = Math.min((i + 1) * 7, daily.length);
     const weekData = daily.slice(weekStart, weekEnd);
-    
+
     weekly.push({
       week: `Week ${i + 1}`,
       queries: weekData.reduce((sum, day) => sum + day.queries, 0),
@@ -70,53 +70,112 @@ export const generateMockCumulativeAnalytics = (): CumulativeAnalytics => {
   const totalCostIncurred = 11.5 + daily.reduce((sum, day) => sum + day.cost, 0);
   const averageLatency = 1420;
 
+  // Calculate model-wise metrics
+  const models = [
+    {
+      id: 'claude-3-5-sonnet',
+      name: 'Claude 3.5 Sonnet',
+      share: 0.35,
+      color: '#D97706',
+      avgInTok: 850,
+      avgOutTok: 450,
+      avgLat: 1500,
+      baseCost: 0.015,
+      acc: 0.98
+    },
+    {
+      id: 'gpt-4o',
+      name: 'GPT-4o',
+      share: 0.28,
+      color: '#10B981',
+      avgInTok: 900,
+      avgOutTok: 500,
+      avgLat: 1450,
+      baseCost: 0.018,
+      acc: 0.97
+    },
+    {
+      id: 'gemini-2-flash',
+      name: 'Gemini 2.0 Flash',
+      share: 0.22,
+      color: '#4285F4',
+      avgInTok: 1200,
+      avgOutTok: 600,
+      avgLat: 650,
+      baseCost: 0.005,
+      acc: 0.95
+    },
+    {
+      id: 'claude-3-haiku',
+      name: 'Claude 3 Haiku',
+      share: 0.15,
+      color: '#F59E0B',
+      avgInTok: 800,
+      avgOutTok: 400,
+      avgLat: 700,
+      baseCost: 0.004,
+      acc: 0.94
+    },
+  ];
+
+  const modelMetrics = models.map(m => {
+    const qCount = Math.round(totalQueries * m.share);
+    const inTokens = qCount * m.avgInTok;
+    const outTokens = qCount * m.avgOutTok;
+    return {
+      modelId: m.id,
+      modelName: m.name,
+      queryCount: qCount,
+      percentage: m.share * 100,
+      color: m.color,
+      inputTokens: inTokens,
+      outputTokens: outTokens,
+      avgLatency: m.avgLat,
+      accuracy: m.acc,
+      totalCost: qCount * m.baseCost
+    };
+  });
+
+  // Re-calculate totals based on model metrics for consistency
+  const refinedTotalTokens = modelMetrics.reduce((acc, m) => acc + m.inputTokens + m.outputTokens, 0);
+  const refinedTotalCost = modelMetrics.reduce((acc, m) => acc + m.totalCost, 0);
+  const refinedTotalInputTokens = modelMetrics.reduce((acc, m) => acc + m.inputTokens, 0);
+  const refinedTotalOutputTokens = modelMetrics.reduce((acc, m) => acc + m.outputTokens, 0);
+
   return {
     totalQueries,
-    totalTokensUsed,
-    totalCostIncurred,
+    totalTokensUsed: refinedTotalTokens,
+    totalCostIncurred: refinedTotalCost,
     averageLatency,
     successRate: 0.967,
     failureRate: 0.033,
-    modelUsageDistribution: [
-      {
-        modelId: 'claude-3-5-sonnet',
-        modelName: 'Claude 3.5 Sonnet',
-        queryCount: Math.round(totalQueries * 0.35),
-        percentage: 35,
-        color: 'hsl(var(--chart-1))',
-      },
-      {
-        modelId: 'gpt-4o',
-        modelName: 'GPT-4o',
-        queryCount: Math.round(totalQueries * 0.28),
-        percentage: 28,
-        color: 'hsl(var(--chart-2))',
-      },
-      {
-        modelId: 'gemini-2-flash',
-        modelName: 'Gemini 2.0 Flash',
-        queryCount: Math.round(totalQueries * 0.22),
-        percentage: 22,
-        color: 'hsl(var(--chart-3))',
-      },
-      {
-        modelId: 'claude-3-haiku',
-        modelName: 'Claude 3 Haiku',
-        queryCount: Math.round(totalQueries * 0.15),
-        percentage: 15,
-        color: 'hsl(var(--chart-4))',
-      },
-    ],
+    modelUsageDistribution: modelMetrics.map(m => ({
+      modelId: m.modelId,
+      modelName: m.modelName,
+      queryCount: m.queryCount,
+      percentage: m.percentage,
+      color: m.color
+    })),
+    modelMetrics: modelMetrics.map(m => ({
+      modelId: m.modelId,
+      modelName: m.modelName,
+      inputTokens: m.inputTokens,
+      outputTokens: m.outputTokens,
+      avgLatency: m.avgLatency,
+      accuracy: m.accuracy,
+      totalCost: m.totalCost,
+      color: m.color
+    })),
     timeBasedTrends: {
       daily,
       weekly,
       monthly,
     },
     performanceMetrics: {
-      totalInputTokens: Math.round(totalTokensUsed * 0.4),
-      totalOutputTokens: Math.round(totalTokensUsed * 0.6),
-      averageCostPerQuery: totalCostIncurred / totalQueries,
-      averageTokensPerQuery: totalTokensUsed / totalQueries,
+      totalInputTokens: refinedTotalInputTokens,
+      totalOutputTokens: refinedTotalOutputTokens,
+      averageCostPerQuery: refinedTotalCost / totalQueries,
+      averageTokensPerQuery: refinedTotalTokens / totalQueries,
       peakLatency: 2850,
       minLatency: 680,
     },

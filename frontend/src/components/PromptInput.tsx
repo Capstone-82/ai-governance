@@ -5,12 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { 
-  Send, 
-  Zap, 
-  DollarSign, 
-  Brain, 
-  BookOpen,
+import {
+  Send,
   Loader2,
   Sparkles,
   Info
@@ -26,12 +22,7 @@ interface PromptInputProps {
   isNewSession: boolean;
 }
 
-const executionModes: { id: ExecutionMode; label: string; icon: React.ElementType; description: string }[] = [
-  { id: 'fast', label: 'Fast', icon: Zap, description: 'Prioritize speed' },
-  { id: 'cost-optimized', label: 'Cost', icon: DollarSign, description: 'Minimize spend' },
-  { id: 'quality-first', label: 'Quality', icon: Brain, description: 'Best reasoning' },
-  { id: 'long-context', label: 'Context', icon: BookOpen, description: 'Large documents' },
-];
+
 
 export function PromptInput({
   models,
@@ -59,7 +50,7 @@ export function PromptInput({
   };
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="bg-card border border-border rounded-xl shadow-card overflow-hidden"
@@ -82,12 +73,7 @@ export function PromptInput({
             </>
           )}
         </div>
-        {estimatedCost > 0 && (
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Info className="w-3.5 h-3.5" />
-            <span>Est. cost: <span className="font-medium text-foreground">${estimatedCost.toFixed(5)}</span></span>
-          </div>
-        )}
+
       </div>
 
       {/* Prompt Area */}
@@ -103,50 +89,55 @@ export function PromptInput({
 
       {/* Model Selection */}
       <div className="px-4 pb-3">
-        <p className="text-xs font-medium text-muted-foreground mb-2">Select Models</p>
-        <div className="flex flex-wrap gap-2">
-          {models.map((model) => (
-            <button
-              key={model.id}
-              onClick={() => onSelectModel(model.id)}
-              className={cn(
-                "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all duration-200",
-                "border hover:shadow-sm",
-                selectedModels.includes(model.id)
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-background text-muted-foreground border-border hover:border-primary/50"
-              )}
-            >
-              <span 
-                className="w-2 h-2 rounded-full" 
-                style={{ backgroundColor: model.color }}
-              />
-              {model.name}
-            </button>
-          ))}
+        <p className="text-xs font-medium text-muted-foreground mb-3">Select Models</p>
+        <div className="space-y-4">
+          {['AWS Bedrock', 'GCP Vertex AI', 'OpenAI'].map((groupName) => {
+            const groupModels = models.filter(m => {
+              const p = m.provider;
+              if (groupName === 'AWS Bedrock') return p === 'anthropic' || p === 'amazon';
+              if (groupName === 'GCP Vertex AI') return p === 'google';
+              if (groupName === 'OpenAI') return p === 'openai';
+              return false;
+            });
+
+            if (groupModels.length === 0) return null;
+
+            return (
+              <div key={groupName}>
+                <h4 className="text-[10px] items-center gap-1.5 font-bold text-muted-foreground/70 uppercase tracking-wider mb-2 flex">
+                  {groupName}
+                  <div className="h-px flex-1 bg-border/60" />
+                </h4>
+                <div className="flex flex-wrap gap-2">
+                  {groupModels.map((model) => (
+                    <button
+                      key={model.id}
+                      onClick={() => onSelectModel(model.id)}
+                      className={cn(
+                        "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all duration-200",
+                        "border hover:shadow-sm",
+                        selectedModels.includes(model.id)
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                      )}
+                    >
+                      <span
+                        className="w-2 h-2 rounded-full ring-1 ring-inset ring-black/10 dark:ring-white/20"
+                        style={{ backgroundColor: model.color }}
+                      />
+                      {model.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Execution Modes & Submit */}
-      <div className="px-4 py-3 border-t border-border bg-muted/20 flex items-center justify-between">
-        <div className="flex items-center gap-1">
-          {executionModes.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => setMode(m.id)}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all duration-200",
-                mode === m.id
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              )}
-              title={m.description}
-            >
-              <m.icon className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{m.label}</span>
-            </button>
-          ))}
-        </div>
+      {/* Submit Button */}
+      <div className="px-4 py-3 border-t border-border bg-muted/20 flex items-center justify-end">
+
 
         <Button
           onClick={handleSubmit}

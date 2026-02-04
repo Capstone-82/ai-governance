@@ -101,6 +101,12 @@ export interface AnalyticsData {
     score: number;
     color: string;
   }[];
+  accuracyComparison: {
+    modelId: string;
+    modelName: string;
+    accuracy: number;
+    color: string;
+  }[];
 }
 
 export interface CumulativeAnalytics {
@@ -148,6 +154,16 @@ export interface CumulativeAnalytics {
     peakLatency: number;
     minLatency: number;
   };
+  modelMetrics: {
+    modelId: string;
+    modelName: string;
+    inputTokens: number;
+    outputTokens: number;
+    avgLatency: number;
+    accuracy: number;
+    totalCost: number;
+    color: string;
+  }[];
 }
 
 export interface DecisionConfidence {

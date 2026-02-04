@@ -1,15 +1,15 @@
 import { useState, useCallback, useMemo } from 'react';
-import { 
-  Session, 
-  Message, 
-  ModelRun, 
-  Recommendation, 
+import {
+  Session,
+  Message,
+  ModelRun,
+  Recommendation,
   PromptSuggestion,
   AnalyticsData,
   CumulativeAnalytics,
   DecisionConfidence,
   DivergenceAnalysis,
-  ExecutionConfig 
+  ExecutionConfig
 } from '@/types/ai-platform';
 import { AI_MODELS, getModelById } from '@/data/models';
 import { generateMockCumulativeAnalytics } from '@/data/mockAnalyticsData';
@@ -64,7 +64,7 @@ export function useAIPlatform() {
     if (!currentSession) return;
 
     setIsExecuting(true);
-    
+
     const userMessage: Message = {
       id: generateId(),
       role: 'user',
@@ -81,14 +81,14 @@ export function useAIPlatform() {
         // Simulate variable latency
         const latencyVariation = 0.7 + Math.random() * 0.6;
         const simulatedLatency = Math.round(model.avgLatency * latencyVariation);
-        
+
         await new Promise(resolve => setTimeout(resolve, simulatedLatency));
 
         const response = createMockResponse(modelId, prompt);
         const inputTokens = Math.round(prompt.length / 4);
         const outputTokens = Math.round(response.length / 4);
-        const cost = (inputTokens / 1000 * model.inputCostPer1k) + 
-                    (outputTokens / 1000 * model.outputCostPer1k);
+        const cost = (inputTokens / 1000 * model.inputCostPer1k) +
+          (outputTokens / 1000 * model.outputCostPer1k);
 
         return {
           id: generateId(),
@@ -189,6 +189,18 @@ export function useAIPlatform() {
           color: model?.color || '#888',
         };
       }),
+      accuracyComparison: runs.map(run => {
+        const model = getModelById(run.modelId);
+        // Simulate accuracy score based on model capabilities complexity
+        const baseAccuracy = model?.capabilities.includes('reasoning') ? 95 : 90;
+        const variation = Math.random() * 4;
+        return {
+          modelId: run.modelId,
+          modelName: model?.name || run.modelId,
+          accuracy: Math.min(99.9, baseAccuracy + variation),
+          color: model?.color || '#888',
+        };
+      }),
     };
     setAnalytics(analyticsData);
   };
@@ -271,12 +283,12 @@ export function useAIPlatform() {
     // Calculate similarity between outputs
     const avgLatency = runs.reduce((sum, r) => sum + r.latencyMs, 0) / runs.length;
     const latencyStability = 100 - Math.min(100, (Math.max(...runs.map(r => r.latencyMs)) - Math.min(...runs.map(r => r.latencyMs))) / avgLatency * 50);
-    
+
     const avgTokens = runs.reduce((sum, r) => sum + r.outputTokens, 0) / runs.length;
     const outputConsistency = 100 - Math.min(100, (Math.max(...runs.map(r => r.outputTokens)) - Math.min(...runs.map(r => r.outputTokens))) / avgTokens * 50);
-    
+
     const overallScore = Math.round((latencyStability + outputConsistency) / 2);
-    
+
     setConfidence({
       score: overallScore,
       level: overallScore >= 75 ? 'high' : overallScore >= 50 ? 'medium' : 'low',
@@ -303,15 +315,15 @@ export function useAIPlatform() {
         });
       }
     }
-    
+
     const avgSimilarity = comparisons.reduce((sum, c) => sum + c.similarity, 0) / comparisons.length;
-    
+
     setDivergence({
       level: avgSimilarity >= 80 ? 'low' : avgSimilarity >= 60 ? 'medium' : 'high',
       score: Math.round(100 - avgSimilarity),
-      details: avgSimilarity >= 80 
+      details: avgSimilarity >= 80
         ? 'Models show strong agreement on this response.'
-        : avgSimilarity >= 60 
+        : avgSimilarity >= 60
           ? 'Some variation detected between model outputs.'
           : 'Significant differences between model responses - review recommended.',
       modelComparisons: comparisons,
@@ -320,7 +332,7 @@ export function useAIPlatform() {
 
   const analyzePrompt = (prompt: string) => {
     const suggestions: PromptSuggestion[] = [];
-    
+
     if (prompt.length > 500) {
       suggestions.push({
         id: generateId(),
@@ -349,12 +361,12 @@ export function useAIPlatform() {
   const estimateCost = (prompt: string, modelIds: string[]): number => {
     const inputTokens = Math.round(prompt.length / 4);
     const estimatedOutputTokens = inputTokens * 2;
-    
+
     return modelIds.reduce((total, modelId) => {
       const model = getModelById(modelId);
       if (!model) return total;
-      return total + (inputTokens / 1000 * model.inputCostPer1k) + 
-             (estimatedOutputTokens / 1000 * model.outputCostPer1k);
+      return total + (inputTokens / 1000 * model.inputCostPer1k) +
+        (estimatedOutputTokens / 1000 * model.outputCostPer1k);
     }, 0);
   };
 
@@ -362,7 +374,7 @@ export function useAIPlatform() {
   const cumulativeAnalytics = useMemo((): CumulativeAnalytics => {
     // Get base mock data and merge with real data
     const mockData = generateMockCumulativeAnalytics();
-    
+
     // If no sessions exist, return mock data for demonstration
     if (sessions.length === 0) {
       return mockData;
@@ -370,7 +382,7 @@ export function useAIPlatform() {
 
     const allRuns: ModelRun[] = [];
     const allMessages: Message[] = [];
-    
+
     sessions.forEach(session => {
       session.messages.forEach(message => {
         allMessages.push(message);
@@ -380,18 +392,18 @@ export function useAIPlatform() {
       });
     });
 
-    const totalQueries = sessions.reduce((sum, session) => 
+    const totalQueries = sessions.reduce((sum, session) =>
       sum + session.messages.filter(m => m.role === 'user').length, 0);
-    
-    const totalTokensUsed = allRuns.reduce((sum, run) => 
+
+    const totalTokensUsed = allRuns.reduce((sum, run) =>
       sum + run.inputTokens + run.outputTokens, 0);
-    
+
     const totalCostIncurred = allRuns.reduce((sum, run) => sum + run.cost, 0);
-    
-    const averageLatency = allRuns.length > 0 
-      ? allRuns.reduce((sum, run) => sum + run.latencyMs, 0) / allRuns.length 
+
+    const averageLatency = allRuns.length > 0
+      ? allRuns.reduce((sum, run) => sum + run.latencyMs, 0) / allRuns.length
       : 0;
-    
+
     const successfulRuns = allRuns.filter(run => run.status === 'completed');
     const failedRuns = allRuns.filter(run => run.status === 'failed');
     const successRate = allRuns.length > 0 ? successfulRuns.length / allRuns.length : 0;
@@ -417,9 +429,9 @@ export function useAIPlatform() {
     // Time-based trends (last 30 days)
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    
+
     const dailyData = new Map<string, { queries: number; tokens: number; cost: number; latencies: number[] }>();
-    
+
     sessions.forEach(session => {
       session.messages.forEach(message => {
         if (message.role === 'user') {
@@ -429,12 +441,12 @@ export function useAIPlatform() {
           }
           const dayData = dailyData.get(dateKey)!;
           dayData.queries += 1;
-          
+
           // Find corresponding assistant message with model runs
-          const assistantMessage = session.messages.find(m => 
+          const assistantMessage = session.messages.find(m =>
             m.role === 'assistant' && m.timestamp > message.timestamp && m.modelRuns
           );
-          
+
           if (assistantMessage?.modelRuns) {
             assistantMessage.modelRuns.forEach(run => {
               dayData.tokens += run.inputTokens + run.outputTokens;
@@ -452,8 +464,8 @@ export function useAIPlatform() {
         queries: data.queries,
         tokens: data.tokens,
         cost: data.cost,
-        avgLatency: data.latencies.length > 0 
-          ? data.latencies.reduce((sum, l) => sum + l, 0) / data.latencies.length 
+        avgLatency: data.latencies.length > 0
+          ? data.latencies.reduce((sum, l) => sum + l, 0) / data.latencies.length
           : 0,
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
@@ -525,21 +537,21 @@ export function useAIPlatform() {
       totalQueries: mockData.totalQueries + totalQueries,
       totalTokensUsed: mockData.totalTokensUsed + totalTokensUsed,
       totalCostIncurred: mockData.totalCostIncurred + totalCostIncurred,
-      averageLatency: allRuns.length > 0 
-        ? (mockData.averageLatency + averageLatency) / 2 
+      averageLatency: allRuns.length > 0
+        ? (mockData.averageLatency + averageLatency) / 2
         : mockData.averageLatency,
-      successRate: allRuns.length > 0 
-        ? (mockData.successRate + successRate) / 2 
+      successRate: allRuns.length > 0
+        ? (mockData.successRate + successRate) / 2
         : mockData.successRate,
-      failureRate: allRuns.length > 0 
-        ? (mockData.failureRate + failureRate) / 2 
+      failureRate: allRuns.length > 0
+        ? (mockData.failureRate + failureRate) / 2
         : mockData.failureRate,
       modelUsageDistribution: [
         ...mockData.modelUsageDistribution.map(model => ({
           ...model,
           queryCount: model.queryCount + (modelUsageDistribution.find(m => m.modelId === model.modelId)?.queryCount || 0),
         })),
-        ...modelUsageDistribution.filter(model => 
+        ...modelUsageDistribution.filter(model =>
           !mockData.modelUsageDistribution.find(m => m.modelId === model.modelId)
         ),
       ].map(model => ({
@@ -555,7 +567,7 @@ export function useAIPlatform() {
               queries: mockDay.queries + realDay.queries,
               tokens: mockDay.tokens + realDay.tokens,
               cost: mockDay.cost + realDay.cost,
-              avgLatency: realDay.avgLatency > 0 
+              avgLatency: realDay.avgLatency > 0
                 ? Math.round((mockDay.avgLatency + realDay.avgLatency) / 2)
                 : mockDay.avgLatency,
             };
@@ -573,6 +585,42 @@ export function useAIPlatform() {
         peakLatency: Math.max(mockData.performanceMetrics.peakLatency, peakLatency),
         minLatency: Math.min(mockData.performanceMetrics.minLatency, minLatency || mockData.performanceMetrics.minLatency),
       },
+      modelMetrics: [
+        ...mockData.modelMetrics.map(mm => {
+          const realMetrics = allRuns.filter(r => r.modelId === mm.modelId);
+          if (realMetrics.length > 0) {
+            const realInput = realMetrics.reduce((sum, r) => sum + r.inputTokens, 0);
+            const realOutput = realMetrics.reduce((sum, r) => sum + r.outputTokens, 0);
+            const realCost = realMetrics.reduce((sum, r) => sum + r.cost, 0);
+            const realLatency = realMetrics.reduce((sum, r) => sum + r.latencyMs, 0) / realMetrics.length;
+
+            return {
+              ...mm,
+              inputTokens: mm.inputTokens + realInput,
+              outputTokens: mm.outputTokens + realOutput,
+              totalCost: mm.totalCost + realCost,
+              avgLatency: (mm.avgLatency + realLatency) / 2,
+            };
+          }
+          return mm;
+        }),
+        ...Array.from(new Set(allRuns.map(r => r.modelId)))
+          .filter(id => !mockData.modelMetrics.find(m => m.modelId === id))
+          .map(id => {
+            const realMetrics = allRuns.filter(r => r.modelId === id);
+            const model = getModelById(id);
+            return {
+              modelId: id,
+              modelName: model?.name || id,
+              inputTokens: realMetrics.reduce((sum, r) => sum + r.inputTokens, 0),
+              outputTokens: realMetrics.reduce((sum, r) => sum + r.outputTokens, 0),
+              avgLatency: realMetrics.reduce((sum, r) => sum + r.latencyMs, 0) / realMetrics.length,
+              accuracy: 0.95, // Default for new models
+              totalCost: realMetrics.reduce((sum, r) => sum + r.cost, 0),
+              color: model?.color || '#888',
+            };
+          }),
+      ],
     };
 
     return mergedData;

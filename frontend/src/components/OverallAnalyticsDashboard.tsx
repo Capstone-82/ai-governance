@@ -17,6 +17,7 @@ import {
   Cell,
   AreaChart,
   Area,
+  ComposedChart,
 } from 'recharts';
 import {
   Activity,
@@ -186,7 +187,7 @@ export function OverallAnalyticsDashboard({ data }: OverallAnalyticsDashboardPro
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip 
+                  <Tooltip
                     content={({ active, payload }) => {
                       if (active && payload && payload.length) {
                         const data = payload[0].payload;
@@ -233,18 +234,18 @@ export function OverallAnalyticsDashboard({ data }: OverallAnalyticsDashboardPro
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={data.timeBasedTrends.daily}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis 
-                      dataKey="date" 
+                    <XAxis
+                      dataKey="date"
                       tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                     />
                     <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
                     <Tooltip content={<CustomTooltip />} />
-                    <Area 
-                      type="monotone" 
-                      dataKey="queries" 
-                      stackId="1" 
-                      stroke="hsl(var(--chart-1))" 
-                      fill="hsl(var(--chart-1))" 
+                    <Area
+                      type="monotone"
+                      dataKey="queries"
+                      stackId="1"
+                      stroke="hsl(var(--chart-1))"
+                      fill="hsl(var(--chart-1))"
                       fillOpacity={0.6}
                       name="Queries"
                     />
@@ -258,23 +259,23 @@ export function OverallAnalyticsDashboard({ data }: OverallAnalyticsDashboardPro
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={data.timeBasedTrends.weekly}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis 
-                      dataKey="week" 
+                    <XAxis
+                      dataKey="week"
                       tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                     />
                     <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
                     <Tooltip content={<CustomTooltip />} />
-                    <Line 
-                      type="monotone" 
-                      dataKey="queries" 
-                      stroke="hsl(var(--chart-2))" 
+                    <Line
+                      type="monotone"
+                      dataKey="queries"
+                      stroke="hsl(var(--chart-2))"
                       strokeWidth={2}
                       name="Queries"
                     />
-                    <Line 
-                      type="monotone" 
-                      dataKey="cost" 
-                      stroke="hsl(var(--chart-3))" 
+                    <Line
+                      type="monotone"
+                      dataKey="cost"
+                      stroke="hsl(var(--chart-3))"
                       strokeWidth={2}
                       name="Cost ($)"
                     />
@@ -288,8 +289,8 @@ export function OverallAnalyticsDashboard({ data }: OverallAnalyticsDashboardPro
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={data.timeBasedTrends.monthly}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis 
-                      dataKey="month" 
+                    <XAxis
+                      dataKey="month"
                       tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                     />
                     <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
@@ -303,103 +304,115 @@ export function OverallAnalyticsDashboard({ data }: OverallAnalyticsDashboardPro
         </CardContent>
       </Card>
 
-      {/* Performance Metrics Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-warning" />
-              Cost Analysis Over Time
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[250px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data.timeBasedTrends.daily}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis 
-                    dataKey="date" 
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                  />
-                  <YAxis 
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                    tickFormatter={formatCurrency}
-                  />
-                  <Tooltip 
-                    content={({ active, payload, label }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
-                            <p className="text-sm font-medium text-foreground">{label}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Cost: <span className="font-medium text-foreground">{formatCurrency(payload[0].value as number)}</span>
-                            </p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="cost" 
-                    stroke="hsl(var(--warning))" 
-                    fill="hsl(var(--warning))" 
-                    fillOpacity={0.3}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="w-5 h-5 text-destructive" />
-              Latency Trends
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[250px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data.timeBasedTrends.daily}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis 
-                    dataKey="date" 
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                  />
-                  <YAxis 
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                    tickFormatter={formatLatency}
-                  />
-                  <Tooltip 
-                    content={({ active, payload, label }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
-                            <p className="text-sm font-medium text-foreground">{label}</p>
-                            <p className="text-sm text-muted-foreground">
-                              Avg Latency: <span className="font-medium text-foreground">{formatLatency(payload[0].value as number)}</span>
-                            </p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="avgLatency" 
-                    stroke="hsl(var(--destructive))" 
-                    strokeWidth={2}
-                    dot={{ fill: 'hsl(var(--destructive))', strokeWidth: 2, r: 4 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
+
+      {/* Model Performance Analysis */}
+      <div className="space-y-6">
+        <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
+          <Zap className="w-5 h-5 text-primary" />
+          Model Performance Analysis
+        </h2>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className=" text-base">Token Consumption (Input vs Output)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.modelMetrics} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
+                    <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`} />
+                    <YAxis dataKey="modelName" type="category" width={100} tick={{ fontSize: 11 }} />
+                    <Tooltip cursor={{ fill: 'transparent' }} content={<CustomTooltip />} />
+                    <Bar dataKey="inputTokens" stackId="a" name="Input Tokens" radius={[0, 0, 0, 4]}>
+                      {data.modelMetrics.map((entry, index) => (
+                        <Cell key={`cell-input-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                    <Bar dataKey="outputTokens" stackId="a" name="Output Tokens" radius={[0, 4, 4, 0]}>
+                      {data.modelMetrics.map((entry, index) => (
+                        <Cell key={`cell-output-${index}`} fill={entry.color} fillOpacity={0.6} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Latency Analysis</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.modelMetrics}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="modelName" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={formatLatency} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="avgLatency" name="Avg Latency" radius={[4, 4, 0, 0]} barSize={40}>
+                      {data.modelMetrics.map((entry, index) => (
+                        <Cell key={`cell-lat-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Model Accuracy</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.modelMetrics}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="modelName" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(val) => `${(val * 100).toFixed(0)}%`} domain={[0.8, 1]} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <Bar dataKey="accuracy" name="Accuracy" radius={[4, 4, 0, 0]} barSize={40}>
+                      {data.modelMetrics.map((entry, index) => (
+                        <Cell key={`cell-acc-${index}`} fill={entry.color} fillOpacity={0.8} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Cost Distribution by Model</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.modelMetrics}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                    <XAxis dataKey="modelName" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={formatCurrency} />
+                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'hsl(var(--muted)/0.2)' }} />
+                    <Bar dataKey="totalCost" name="Total Cost" radius={[4, 4, 0, 0]} barSize={40}>
+                      {data.modelMetrics.map((entry, index) => (
+                        <Cell key={`cell-cost-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </motion.div>
   );
