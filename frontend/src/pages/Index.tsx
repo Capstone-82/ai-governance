@@ -11,8 +11,9 @@ import { MessageHistory } from '@/components/MessageHistory';
 import { useAIPlatform } from '@/hooks/useAIPlatform';
 import { ExecutionMode } from '@/types/ai-platform';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart3, Lightbulb, Layers } from 'lucide-react';
+import { BarChart3, Lightbulb, Layers, ShieldCheck } from 'lucide-react';
 
 const Index = () => {
   const {
@@ -26,6 +27,7 @@ const Index = () => {
     confidence,
     divergence,
     createSession,
+    renameSession,
     setCurrentSession,
     executePrompt,
     estimateCost,
@@ -37,6 +39,7 @@ const Index = () => {
     'gemini-2-flash',
     'gpt-4o',
   ]);
+  const [guardrailsEnabled, setGuardrailsEnabled] = useState(true);
 
   const handleSelectModel = (modelId: string) => {
     setSelectedModels(prev =>
@@ -91,17 +94,34 @@ const Index = () => {
         currentSession={currentSession}
         onSelectSession={setCurrentSession}
         onNewSession={handleNewSession}
+        onRenameSession={renameSession}
       />
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
         {/* Top Bar */}
-        <header className="h-14 border-b border-border bg-card/50 backdrop-blur-sm flex items-center justify-between px-6 shrink-0">
+        <header className="h-14 border-b border-border bg-background/80 flex items-center justify-between px-6 shrink-0">
           <div className="flex items-center gap-4">
             <h2 className="font-semibold text-foreground">
               {currentSession ? currentSession.title : 'AI Cloud Governance'}
             </h2>
             {/* Removed session stats and shortcuts */}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              aria-pressed={guardrailsEnabled}
+              onClick={() => setGuardrailsEnabled(prev => !prev)}
+              className={
+                guardrailsEnabled
+                  ? "border-primary/30 bg-primary text-primary-foreground hover:bg-primary/90"
+                  : "border-border text-muted-foreground hover:bg-muted"
+              }
+            >
+              <ShieldCheck className="w-4 h-4 mr-2" />
+              {guardrailsEnabled ? 'Guardrails On' : 'Guardrails Off'}
+            </Button>
           </div>
         </header>
 
@@ -182,6 +202,7 @@ const Index = () => {
                           confidence={confidence}
                           divergence={divergence}
                           analytics={analytics}
+                          cumulativeAnalytics={cumulativeAnalytics}
                         />
                       </TabsContent>
                     </Tabs>

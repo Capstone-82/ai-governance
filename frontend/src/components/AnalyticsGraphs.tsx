@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { AnalyticsData } from '@/types/ai-platform';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
+  // AreaChart,
   BarChart,
   Bar,
   XAxis,
@@ -23,7 +24,7 @@ interface AnalyticsGraphsProps {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
+      <div className="bg-popover border border-border rounded-lg shadow-sm p-3">
         <p className="text-sm font-medium text-foreground">{label}</p>
         {payload.map((entry: any, index: number) => (
           <p key={index} className="text-sm text-muted-foreground">
@@ -53,7 +54,7 @@ export function AnalyticsGraphs({ data }: AnalyticsGraphsProps) {
         <Card className="col-span-1">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <FileText className="w-4 h-4 text-info" />
+              <FileText className="w-4 h-4 text-primary" />
               Input Token Usage
             </CardTitle>
           </CardHeader>
@@ -70,7 +71,7 @@ export function AnalyticsGraphs({ data }: AnalyticsGraphsProps) {
                     tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                   />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="inputTokens" fill="hsl(var(--info))" name="Input Tokens" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="inputTokens" fill="hsl(var(--primary))" name="Input Tokens" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -81,7 +82,7 @@ export function AnalyticsGraphs({ data }: AnalyticsGraphsProps) {
         <Card className="col-span-1">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <FileText className="w-4 h-4 text-success" />
+              <FileText className="w-4 h-4 text-primary" />
               Output Token Usage
             </CardTitle>
           </CardHeader>
@@ -98,7 +99,7 @@ export function AnalyticsGraphs({ data }: AnalyticsGraphsProps) {
                     tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
                   />
                   <Tooltip content={<CustomTooltip />} />
-                  <Bar dataKey="outputTokens" fill="hsl(var(--success))" name="Output Tokens" radius={[0, 4, 4, 0]} />
+                  <Bar dataKey="outputTokens" fill="hsl(var(--primary))" fillOpacity={0.55} name="Output Tokens" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -146,7 +147,7 @@ export function AnalyticsGraphs({ data }: AnalyticsGraphsProps) {
         <Card className="col-span-1">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Clock className="w-4 h-4 text-speed" />
+              <Clock className="w-4 h-4 text-primary" />
               Response Latency
             </CardTitle>
           </CardHeader>
@@ -179,7 +180,7 @@ export function AnalyticsGraphs({ data }: AnalyticsGraphsProps) {
         <Card className="col-span-1">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Coins className="w-4 h-4 text-cost" />
+              <Coins className="w-4 h-4 text-primary" />
               Cost Analysis
             </CardTitle>
           </CardHeader>
@@ -215,7 +216,7 @@ export function AnalyticsGraphs({ data }: AnalyticsGraphsProps) {
         <Card className="col-span-1">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Layers className="w-4 h-4 text-context" />
+              <Layers className="w-4 h-4 text-primary" />
               Context Utilization
             </CardTitle>
           </CardHeader>
@@ -246,7 +247,7 @@ export function AnalyticsGraphs({ data }: AnalyticsGraphsProps) {
         <Card className="col-span-1 md:col-span-2">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Gauge className="w-4 h-4 text-quality" />
+              <Gauge className="w-4 h-4 text-primary" />
               Efficiency Score
             </CardTitle>
           </CardHeader>

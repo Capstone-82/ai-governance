@@ -45,7 +45,7 @@ export function ModelResultCard({ run, index, isRecommended, recommendationType 
     >
       <Card className={cn(
         "group overflow-hidden border transition-all duration-300",
-        isRecommended ? "ring-2 ring-primary/20 border-primary/50 shadow-lg" : "hover:border-primary/20 hover:shadow-md",
+        isRecommended ? "border-primary/40 bg-primary/5" : "hover:border-border",
         "bg-card"
       )}>
         <CardHeader className="p-4 space-y-0 pb-3">
@@ -64,22 +64,22 @@ export function ModelResultCard({ run, index, isRecommended, recommendationType 
               onClick={handleCopy}
               className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground"
             >
-              {copied ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? <Check className="w-3.5 h-3.5 text-primary" /> : <Copy className="w-3.5 h-3.5" />}
             </button>
           </div>
 
           {/* Metrics using a Grid for better alignment */}
           <div className="grid grid-cols-2 gap-y-2 gap-x-4 mt-4 pt-3 border-t border-border/50">
             <div className="flex items-center gap-2 text-xs">
-              <Clock className="w-3.5 h-3.5 text-blue-500" />
+              <Clock className="w-3.5 h-3.5 text-muted-foreground" />
               <span className="font-medium text-foreground/80">{run.latencyMs}ms</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
-              <Coins className="w-3.5 h-3.5 text-amber-500" />
+              <Coins className="w-3.5 h-3.5 text-muted-foreground" />
               <span className="font-medium text-foreground/80">${run.cost.toFixed(5)}</span>
             </div>
             <div className="flex items-center gap-2 text-xs col-span-2">
-              <FileText className="w-3.5 h-3.5 text-slate-500" />
+              <FileText className="w-3.5 h-3.5 text-muted-foreground" />
               <span className="text-muted-foreground">
                 <span className="text-foreground/80">{run.inputTokens}</span> in · <span className="text-foreground/80">{run.outputTokens}</span> out
               </span>
@@ -117,7 +117,7 @@ export function ModelResultCard({ run, index, isRecommended, recommendationType 
 
         {isRecommended && (
           <div className="absolute top-0 right-0 p-3">
-            <Badge variant="secondary" className="bg-green-500/10 text-green-600 dark:text-green-400 hover:bg-green-500/20 border-0 flex gap-1 items-center px-2 py-0.5 text-[10px]">
+            <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/15 border-0 flex gap-1 items-center px-2 py-0.5 text-[10px]">
               <Sparkles className="w-2.5 h-2.5" />
               {recommendationType}
             </Badge>
