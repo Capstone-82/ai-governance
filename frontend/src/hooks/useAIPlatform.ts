@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Session,
   Message,
@@ -15,6 +15,35 @@ import { AI_MODELS, getModelById } from '@/data/models';
 import { generateMockCumulativeAnalytics } from '@/data/mockAnalyticsData';
 
 const generateId = () => Math.random().toString(36).substring(2, 15);
+const SESSION_STORAGE_KEY = 'ai-platform-sessions';
+const CURRENT_SESSION_KEY = 'ai-platform-current-session';
+
+const reviveSessions = (stored: Session[]): Session[] =>
+  stored.map((session) => ({
+    ...session,
+    createdAt: new Date(session.createdAt),
+    updatedAt: new Date(session.updatedAt),
+    messages: (session.messages || []).map((message) => ({
+      ...message,
+      timestamp: new Date(message.timestamp),
+      modelRuns: message.modelRuns?.map((run) => ({
+        ...run,
+        timestamp: new Date(run.timestamp),
+      })),
+    })),
+  }));
+
+const loadSessionsFromStorage = (): Session[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as Session[];
+    return reviveSessions(parsed);
+  } catch {
+    return [];
+  }
+};
 
 const createMockResponse = (modelId: string, prompt: string): string => {
   const model = getModelById(modelId);
@@ -40,6 +69,30 @@ export function useAIPlatform() {
   const [confidence, setConfidence] = useState<DecisionConfidence | null>(null);
   const [divergence, setDivergence] = useState<DivergenceAnalysis | null>(null);
 
+  useEffect(() => {
+    const storedSessions = loadSessionsFromStorage();
+    if (storedSessions.length > 0) {
+      setSessions(storedSessions);
+      const storedCurrentId = sessionStorage.getItem(CURRENT_SESSION_KEY);
+      const matchedSession = storedSessions.find((session) => session.id === storedCurrentId);
+      setCurrentSession(matchedSession || storedSessions[0] || null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessions));
+  }, [sessions]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (currentSession) {
+      sessionStorage.setItem(CURRENT_SESSION_KEY, currentSession.id);
+    } else {
+      sessionStorage.removeItem(CURRENT_SESSION_KEY);
+    }
+  }, [currentSession]);
+
   const createSession = useCallback(() => {
     const newSession: Session = {
       id: generateId(),
@@ -55,6 +108,19 @@ export function useAIPlatform() {
     setSessions(prev => [newSession, ...prev]);
     setCurrentSession(newSession);
     return newSession;
+  }, []);
+
+  const renameSession = useCallback((sessionId: string, title: string) => {
+    setSessions(prev =>
+      prev.map(session =>
+        session.id === sessionId
+          ? { ...session, title, updatedAt: new Date() }
+          : session
+      )
+    );
+    setCurrentSession(prev =>
+      prev && prev.id === sessionId ? { ...prev, title, updatedAt: new Date() } : prev
+    );
   }, []);
 
   const executePrompt = useCallback(async (
@@ -637,6 +703,7 @@ export function useAIPlatform() {
     confidence,
     divergence,
     createSession,
+    renameSession,
     setCurrentSession,
     executePrompt,
     estimateCost,

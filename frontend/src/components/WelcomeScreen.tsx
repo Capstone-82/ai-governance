@@ -51,7 +51,7 @@ export function WelcomeScreen({ onStartSession }: WelcomeScreenProps) {
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.1 }}
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-info-muted text-info text-sm font-medium mb-6"
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6"
         >
           <Sparkles className="w-4 h-4" />
           Enterprise AI Platform
@@ -68,9 +68,7 @@ export function WelcomeScreen({ onStartSession }: WelcomeScreenProps) {
           <br />
           <span className="text-muted-foreground">Every Model.</span>
           <br />
-          <span className="bg-clip-text text-transparent bg-gradient-to-r from-info to-success">
-            Optimal Decision.
-          </span>
+          <span className="text-primary">Optimal Decision.</span>
         </motion.h1>
 
         <motion.p
@@ -92,7 +90,7 @@ export function WelcomeScreen({ onStartSession }: WelcomeScreenProps) {
           <Button 
             onClick={onStartSession}
             size="lg"
-            className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-6 text-base font-medium shadow-lg hover:shadow-xl transition-all duration-200"
+            className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-6 text-base font-medium shadow-none"
           >
             Start New Session
             <ArrowRight className="w-5 h-5 ml-2" />
@@ -107,11 +105,11 @@ export function WelcomeScreen({ onStartSession }: WelcomeScreenProps) {
           className="flex items-center justify-center gap-6 mt-8 text-sm text-muted-foreground"
         >
           <div className="flex items-center gap-1.5">
-            <Shield className="w-4 h-4 text-success" />
+            <Shield className="w-4 h-4 text-primary" />
             <span>Enterprise-grade</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <Zap className="w-4 h-4 text-warning" />
+            <Zap className="w-4 h-4 text-primary" />
             <span>Real-time analytics</span>
           </div>
         </motion.div>
@@ -130,10 +128,10 @@ export function WelcomeScreen({ onStartSession }: WelcomeScreenProps) {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.7 + index * 0.1 }}
-            className="flex items-start gap-4 p-4 rounded-xl bg-card border border-border hover:shadow-md transition-all duration-200"
+            className="flex items-start gap-4 p-4 rounded-xl bg-card border border-border hover:border-primary/30 transition-all duration-200"
           >
-            <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-              <feature.icon className="w-5 h-5 text-foreground" />
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <feature.icon className="w-5 h-5 text-primary" />
             </div>
             <div>
               <h3 className="font-medium text-foreground mb-1">{feature.title}</h3>

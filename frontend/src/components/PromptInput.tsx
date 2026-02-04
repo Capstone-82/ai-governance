@@ -9,7 +9,7 @@ import {
   Send,
   Loader2,
   Sparkles,
-  Info
+  Check
 } from 'lucide-react';
 
 interface PromptInputProps {
@@ -43,8 +43,9 @@ export function PromptInput({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
       handleSubmit();
     }
   };
@@ -53,21 +54,22 @@ export function PromptInput({
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-card border border-border rounded-xl shadow-card overflow-hidden"
+      className="relative overflow-hidden rounded-2xl border border-border bg-card ring-1 ring-primary/10 shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
     >
+      <div className="absolute inset-x-0 top-0 h-0.5 bg-primary" />
       {/* Session Status */}
-      <div className="px-4 py-2 border-b border-border bg-muted/30 flex items-center justify-between">
+      <div className="px-5 py-3 border-b border-border bg-muted flex items-center justify-between">
         <div className="flex items-center gap-2">
           {isNewSession ? (
             <>
-              <Sparkles className="w-4 h-4 text-info" />
-              <span className="text-sm font-medium text-foreground">New Session</span>
+              <Sparkles className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold text-foreground">New Session</span>
             </>
           ) : (
             <>
-              <div className="w-2 h-2 rounded-full bg-success" />
-              <span className="text-sm font-medium text-foreground">Continuing from History</span>
-              <Badge variant="secondary" className="text-xs bg-success-muted text-success">
+              <div className="w-2 h-2 rounded-full bg-primary" />
+              <span className="text-sm font-semibold text-foreground">Continuing from History</span>
+              <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-0">
                 Token Optimized
               </Badge>
             </>
@@ -77,20 +79,27 @@ export function PromptInput({
       </div>
 
       {/* Prompt Area */}
-      <div className="p-4">
-        <Textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Enter your prompt to compare across AI models..."
-          className="min-h-[120px] resize-none border-0 bg-transparent focus-visible:ring-0 text-base placeholder:text-muted-foreground/60"
-        />
+      <div className="p-5">
+        <div className="rounded-xl border border-border bg-card focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/40">
+          <Textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Enter your prompt to compare across AI models..."
+            className="min-h-[140px] resize-none border-0 bg-transparent focus-visible:ring-0 text-base text-foreground placeholder:text-muted-foreground px-4 py-3"
+          />
+        </div>
       </div>
 
       {/* Model Selection */}
-      <div className="px-4 pb-3">
-        <p className="text-xs font-medium text-muted-foreground mb-3">Select Models</p>
-        <div className="space-y-4">
+      <div className="px-5 pb-5">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs font-semibold tracking-[0.2em] uppercase text-muted-foreground">Select Models</p>
+          <span className="text-[11px] px-2 py-0.5 rounded-full bg-primary text-white">
+            {selectedModels.length} selected
+          </span>
+        </div>
+        <div className="space-y-3">
           {['AWS Bedrock', 'GCP Vertex AI', 'OpenAI'].map((groupName) => {
             const groupModels = models.filter(m => {
               const p = m.provider;
@@ -103,31 +112,38 @@ export function PromptInput({
             if (groupModels.length === 0) return null;
 
             return (
-              <div key={groupName}>
-                <h4 className="text-[10px] items-center gap-1.5 font-bold text-muted-foreground/70 uppercase tracking-wider mb-2 flex">
-                  {groupName}
-                  <div className="h-px flex-1 bg-border/60" />
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  {groupModels.map((model) => (
-                    <button
-                      key={model.id}
-                      onClick={() => onSelectModel(model.id)}
-                      className={cn(
-                        "inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm transition-all duration-200",
-                        "border hover:shadow-sm",
-                        selectedModels.includes(model.id)
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-background text-muted-foreground border-border hover:border-primary/50"
-                      )}
-                    >
-                      <span
-                        className="w-2 h-2 rounded-full ring-1 ring-inset ring-black/10 dark:ring-white/20"
-                        style={{ backgroundColor: model.color }}
-                      />
-                      {model.name}
-                    </button>
-                  ))}
+              <div key={groupName} className="rounded-2xl border border-border bg-card p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground">
+                    {groupName}
+                  </h4>
+                  <span className="text-[10px] text-muted-foreground">{groupModels.length} models</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  {groupModels.map((model) => {
+                    const isSelected = selectedModels.includes(model.id);
+                    return (
+                      <button
+                        key={model.id}
+                        onClick={() => onSelectModel(model.id)}
+                        aria-pressed={isSelected}
+                        className={cn(
+                          "group relative flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                          "outline-none focus-visible:ring-2 focus-visible:ring-primary/20",
+                          isSelected
+                            ? "bg-primary/10 text-foreground border-primary/40"
+                            : "bg-card text-foreground border-border hover:border-primary/30 hover:bg-primary/5"
+                        )}
+                      >
+                        <span
+                          className="h-2.5 w-2.5 rounded-full ring-1 ring-inset ring-black/10 dark:ring-white/20"
+                          style={{ backgroundColor: model.color }}
+                        />
+                        <span className="truncate">{model.name}</span>
+                        {isSelected && <Check className="ml-auto h-4 w-4 text-primary" />}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -136,13 +152,14 @@ export function PromptInput({
       </div>
 
       {/* Submit Button */}
-      <div className="px-4 py-3 border-t border-border bg-muted/20 flex items-center justify-end">
+      <div className="px-5 py-4 border-t border-border bg-muted flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">Tip: Press Shift + Enter for a new line</p>
 
 
         <Button
           onClick={handleSubmit}
           disabled={!prompt.trim() || selectedModels.length === 0 || isExecuting}
-          className="bg-primary hover:bg-primary/90"
+          className="bg-primary hover:bg-primary/90 text-primary-foreground"
         >
           {isExecuting ? (
             <>
@@ -154,7 +171,7 @@ export function PromptInput({
               <Send className="w-4 h-4 mr-2" />
               Execute
               <kbd className="ml-2 hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs bg-primary-foreground/20 rounded">
-                ⌘↵
+                Enter
               </kbd>
             </>
           )}

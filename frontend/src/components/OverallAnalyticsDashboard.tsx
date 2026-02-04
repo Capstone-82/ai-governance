@@ -1,7 +1,6 @@
 import { motion } from 'framer-motion';
 import { CumulativeAnalytics } from '@/types/ai-platform';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   BarChart,
   Bar,
@@ -10,25 +9,16 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  LineChart,
-  Line,
   PieChart,
   Pie,
   Cell,
-  AreaChart,
-  Area,
-  ComposedChart,
 } from 'recharts';
 import {
-  Activity,
   DollarSign,
   Clock,
-  TrendingUp,
   Users,
   CheckCircle,
-  XCircle,
   BarChart3,
-  Calendar,
   Zap,
 } from 'lucide-react';
 
@@ -39,7 +29,7 @@ interface OverallAnalyticsDashboardProps {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
+      <div className="bg-popover border border-border rounded-lg shadow-sm p-3">
         <p className="text-sm font-medium text-foreground">{label}</p>
         {payload.map((entry: any, index: number) => (
           <p key={index} className="text-sm text-muted-foreground">
@@ -65,66 +55,70 @@ export function OverallAnalyticsDashboard({ data }: OverallAnalyticsDashboardPro
       className="space-y-6"
     >
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Overall Analytics Dashboard</h1>
-          <p className="text-muted-foreground">Cumulative system performance and usage insights</p>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Activity className="w-4 h-4" />
-          <span>Live data</span>
-          <div className="w-2 h-2 rounded-full bg-success animate-pulse" />
-        </div>
+      <div className="flex flex-col gap-2">
+        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Overview</p>
+        <h1 className="text-2xl font-semibold text-foreground">Overall Analytics</h1>
+        <p className="text-sm text-muted-foreground">
+          Cumulative system performance and usage insights
+        </p>
       </div>
 
       {/* Key Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
+        <Card className="border border-border bg-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Queries</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold text-foreground">Total Queries</CardTitle>
+            <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+              <BarChart3 className="h-4 w-4" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatNumber(data.totalQueries)}</div>
+            <div className="text-2xl font-bold text-foreground">{formatNumber(data.totalQueries)}</div>
             <p className="text-xs text-muted-foreground">
               Processed across all models
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border border-border bg-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold text-foreground">Total Cost</CardTitle>
+            <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+              <DollarSign className="h-4 w-4" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(data.totalCostIncurred)}</div>
+            <div className="text-2xl font-bold text-foreground">{formatCurrency(data.totalCostIncurred)}</div>
             <p className="text-xs text-muted-foreground">
               Avg {formatCurrency(data.performanceMetrics.averageCostPerQuery)} per query
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border border-border bg-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Latency</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold text-foreground">Avg Latency</CardTitle>
+            <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+              <Clock className="h-4 w-4" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatLatency(data.averageLatency)}</div>
+            <div className="text-2xl font-bold text-foreground">{formatLatency(data.averageLatency)}</div>
             <p className="text-xs text-muted-foreground">
               Range: {formatLatency(data.performanceMetrics.minLatency)} - {formatLatency(data.performanceMetrics.peakLatency)}
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border border-border bg-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-semibold text-foreground">Success Rate</CardTitle>
+            <div className="h-8 w-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
+              <CheckCircle className="h-4 w-4" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{(data.successRate * 100).toFixed(1)}%</div>
+            <div className="text-2xl font-bold text-foreground">{(data.successRate * 100).toFixed(1)}%</div>
             <p className="text-xs text-muted-foreground">
               {(data.failureRate * 100).toFixed(1)}% failure rate
             </p>
@@ -134,10 +128,10 @@ export function OverallAnalyticsDashboard({ data }: OverallAnalyticsDashboardPro
 
       {/* Token Usage Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
+        <Card className="border border-border bg-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Zap className="w-5 h-5 text-info" />
+              <Zap className="w-5 h-5 text-primary" />
               Token Usage Breakdown
             </CardTitle>
           </CardHeader>
@@ -163,10 +157,10 @@ export function OverallAnalyticsDashboard({ data }: OverallAnalyticsDashboardPro
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border border-border bg-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-success" />
+              <Users className="w-5 h-5 text-primary" />
               Model Usage Distribution
             </CardTitle>
           </CardHeader>
@@ -192,7 +186,7 @@ export function OverallAnalyticsDashboard({ data }: OverallAnalyticsDashboardPro
                       if (active && payload && payload.length) {
                         const data = payload[0].payload;
                         return (
-                          <div className="bg-popover border border-border rounded-lg shadow-lg p-3">
+                          <div className="bg-popover border border-border rounded-lg shadow-sm p-3">
                             <p className="text-sm font-medium text-foreground">{data.modelName}</p>
                             <p className="text-sm text-muted-foreground">
                               Queries: <span className="font-medium text-foreground">{data.queryCount}</span>
@@ -213,99 +207,6 @@ export function OverallAnalyticsDashboard({ data }: OverallAnalyticsDashboardPro
         </Card>
       </div>
 
-      {/* Time-based Trends */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-chart-1" />
-            Usage Trends Over Time
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="daily" className="w-full">
-            <TabsList className="grid w-full max-w-md grid-cols-3">
-              <TabsTrigger value="daily">Daily</TabsTrigger>
-              <TabsTrigger value="weekly">Weekly</TabsTrigger>
-              <TabsTrigger value="monthly">Monthly</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="daily" className="mt-6">
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={data.timeBasedTrends.daily}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis
-                      dataKey="date"
-                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                    />
-                    <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Area
-                      type="monotone"
-                      dataKey="queries"
-                      stackId="1"
-                      stroke="hsl(var(--chart-1))"
-                      fill="hsl(var(--chart-1))"
-                      fillOpacity={0.6}
-                      name="Queries"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="weekly" className="mt-6">
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={data.timeBasedTrends.weekly}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis
-                      dataKey="week"
-                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                    />
-                    <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Line
-                      type="monotone"
-                      dataKey="queries"
-                      stroke="hsl(var(--chart-2))"
-                      strokeWidth={2}
-                      name="Queries"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="cost"
-                      stroke="hsl(var(--chart-3))"
-                      strokeWidth={2}
-                      name="Cost ($)"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="monthly" className="mt-6">
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data.timeBasedTrends.monthly}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis
-                      dataKey="month"
-                      tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
-                    />
-                    <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Bar dataKey="queries" fill="hsl(var(--chart-4))" name="Queries" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
-
-
-
       {/* Model Performance Analysis */}
       <div className="space-y-6">
         <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
@@ -314,7 +215,7 @@ export function OverallAnalyticsDashboard({ data }: OverallAnalyticsDashboardPro
         </h2>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
+          <Card className="border border-border bg-card">
             <CardHeader>
               <CardTitle className=" text-base">Token Consumption (Input vs Output)</CardTitle>
             </CardHeader>
@@ -342,7 +243,7 @@ export function OverallAnalyticsDashboard({ data }: OverallAnalyticsDashboardPro
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border border-border bg-card">
             <CardHeader>
               <CardTitle className="text-base">Latency Analysis</CardTitle>
             </CardHeader>
@@ -367,7 +268,7 @@ export function OverallAnalyticsDashboard({ data }: OverallAnalyticsDashboardPro
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card>
+          <Card className="border border-border bg-card">
             <CardHeader>
               <CardTitle className="text-base">Model Accuracy</CardTitle>
             </CardHeader>
@@ -390,7 +291,7 @@ export function OverallAnalyticsDashboard({ data }: OverallAnalyticsDashboardPro
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border border-border bg-card">
             <CardHeader>
               <CardTitle className="text-base">Cost Distribution by Model</CardTitle>
             </CardHeader>
