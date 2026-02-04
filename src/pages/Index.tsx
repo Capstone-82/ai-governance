@@ -4,6 +4,7 @@ import { SessionSidebar } from '@/components/SessionSidebar';
 import { PromptInput } from '@/components/PromptInput';
 import { ResultsComparison } from '@/components/ResultsComparison';
 import { AnalyticsGraphs } from '@/components/AnalyticsGraphs';
+import { OverallAnalyticsDashboard } from '@/components/OverallAnalyticsDashboard';
 import { RecommendationsPanel } from '@/components/RecommendationsPanel';
 import { WelcomeScreen } from '@/components/WelcomeScreen';
 import { MessageHistory } from '@/components/MessageHistory';
@@ -11,7 +12,7 @@ import { useAIPlatform } from '@/hooks/useAIPlatform';
 import { ExecutionMode } from '@/types/ai-platform';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BarChart3, Lightbulb, Layers } from 'lucide-react';
+import { BarChart3, Lightbulb, Layers, TrendingUp } from 'lucide-react';
 
 const Index = () => {
   const {
@@ -21,6 +22,7 @@ const Index = () => {
     recommendations,
     promptSuggestions,
     analytics,
+    cumulativeAnalytics,
     confidence,
     divergence,
     createSession,
@@ -107,6 +109,9 @@ const Index = () => {
                 <span className="px-2 py-0.5 rounded bg-muted">
                   ${currentSession.totalCost.toFixed(5)} spent
                 </span>
+                <span className="px-2 py-0.5 rounded bg-success/20 text-success text-xs">
+                  Analytics tracking
+                </span>
               </div>
             )}
           </div>
@@ -159,7 +164,7 @@ const Index = () => {
                     {/* Main Content - Results & Analytics */}
                     <div className="xl:col-span-2 space-y-6">
                       <Tabs defaultValue="results" className="w-full">
-                        <TabsList className="grid w-full max-w-md grid-cols-3">
+                        <TabsList className="grid w-full max-w-lg grid-cols-4">
                           <TabsTrigger value="results" className="flex items-center gap-2">
                             <Layers className="w-4 h-4" />
                             Results
@@ -167,6 +172,10 @@ const Index = () => {
                           <TabsTrigger value="analytics" className="flex items-center gap-2">
                             <BarChart3 className="w-4 h-4" />
                             Analytics
+                          </TabsTrigger>
+                          <TabsTrigger value="overall" className="flex items-center gap-2">
+                            <TrendingUp className="w-4 h-4" />
+                            Overall
                           </TabsTrigger>
                           <TabsTrigger value="insights" className="flex items-center gap-2 xl:hidden">
                             <Lightbulb className="w-4 h-4" />
@@ -184,6 +193,10 @@ const Index = () => {
 
                         <TabsContent value="analytics" className="mt-6">
                           {analytics && <AnalyticsGraphs data={analytics} />}
+                        </TabsContent>
+
+                        <TabsContent value="overall" className="mt-6">
+                          <OverallAnalyticsDashboard data={cumulativeAnalytics} />
                         </TabsContent>
 
                         <TabsContent value="insights" className="mt-6 xl:hidden">

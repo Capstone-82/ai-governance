@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { 
   Session, 
   Message, 
@@ -6,11 +6,13 @@ import {
   Recommendation, 
   PromptSuggestion,
   AnalyticsData,
+  CumulativeAnalytics,
   DecisionConfidence,
   DivergenceAnalysis,
   ExecutionConfig 
 } from '@/types/ai-platform';
 import { AI_MODELS, getModelById } from '@/data/models';
+import { generateMockCumulativeAnalytics } from '@/data/mockAnalyticsData';
 
 const generateId = () => Math.random().toString(36).substring(2, 15);
 
@@ -356,6 +358,226 @@ export function useAIPlatform() {
     }, 0);
   };
 
+  // Generate cumulative analytics across all sessions
+  const cumulativeAnalytics = useMemo((): CumulativeAnalytics => {
+    // Get base mock data and merge with real data
+    const mockData = generateMockCumulativeAnalytics();
+    
+    // If no sessions exist, return mock data for demonstration
+    if (sessions.length === 0) {
+      return mockData;
+    }
+
+    const allRuns: ModelRun[] = [];
+    const allMessages: Message[] = [];
+    
+    sessions.forEach(session => {
+      session.messages.forEach(message => {
+        allMessages.push(message);
+        if (message.modelRuns) {
+          allRuns.push(...message.modelRuns);
+        }
+      });
+    });
+
+    const totalQueries = sessions.reduce((sum, session) => 
+      sum + session.messages.filter(m => m.role === 'user').length, 0);
+    
+    const totalTokensUsed = allRuns.reduce((sum, run) => 
+      sum + run.inputTokens + run.outputTokens, 0);
+    
+    const totalCostIncurred = allRuns.reduce((sum, run) => sum + run.cost, 0);
+    
+    const averageLatency = allRuns.length > 0 
+      ? allRuns.reduce((sum, run) => sum + run.latencyMs, 0) / allRuns.length 
+      : 0;
+    
+    const successfulRuns = allRuns.filter(run => run.status === 'completed');
+    const failedRuns = allRuns.filter(run => run.status === 'failed');
+    const successRate = allRuns.length > 0 ? successfulRuns.length / allRuns.length : 0;
+    const failureRate = allRuns.length > 0 ? failedRuns.length / allRuns.length : 0;
+
+    // Model usage distribution
+    const modelUsage = new Map<string, number>();
+    allRuns.forEach(run => {
+      modelUsage.set(run.modelId, (modelUsage.get(run.modelId) || 0) + 1);
+    });
+
+    const modelUsageDistribution = Array.from(modelUsage.entries()).map(([modelId, count]) => {
+      const model = getModelById(modelId);
+      return {
+        modelId,
+        modelName: model?.name || modelId,
+        queryCount: count,
+        percentage: (count / allRuns.length) * 100,
+        color: model?.color || '#888',
+      };
+    });
+
+    // Time-based trends (last 30 days)
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    
+    const dailyData = new Map<string, { queries: number; tokens: number; cost: number; latencies: number[] }>();
+    
+    sessions.forEach(session => {
+      session.messages.forEach(message => {
+        if (message.role === 'user') {
+          const dateKey = message.timestamp.toISOString().split('T')[0];
+          if (!dailyData.has(dateKey)) {
+            dailyData.set(dateKey, { queries: 0, tokens: 0, cost: 0, latencies: [] });
+          }
+          const dayData = dailyData.get(dateKey)!;
+          dayData.queries += 1;
+          
+          // Find corresponding assistant message with model runs
+          const assistantMessage = session.messages.find(m => 
+            m.role === 'assistant' && m.timestamp > message.timestamp && m.modelRuns
+          );
+          
+          if (assistantMessage?.modelRuns) {
+            assistantMessage.modelRuns.forEach(run => {
+              dayData.tokens += run.inputTokens + run.outputTokens;
+              dayData.cost += run.cost;
+              dayData.latencies.push(run.latencyMs);
+            });
+          }
+        }
+      });
+    });
+
+    const daily = Array.from(dailyData.entries())
+      .map(([date, data]) => ({
+        date,
+        queries: data.queries,
+        tokens: data.tokens,
+        cost: data.cost,
+        avgLatency: data.latencies.length > 0 
+          ? data.latencies.reduce((sum, l) => sum + l, 0) / data.latencies.length 
+          : 0,
+      }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    // Generate weekly and monthly aggregations
+    const weekly = daily.reduce((weeks: any[], day, index) => {
+      const weekIndex = Math.floor(index / 7);
+      if (!weeks[weekIndex]) {
+        weeks[weekIndex] = {
+          week: `Week ${weekIndex + 1}`,
+          queries: 0,
+          tokens: 0,
+          cost: 0,
+          avgLatency: 0,
+          latencySum: 0,
+          latencyCount: 0,
+        };
+      }
+      weeks[weekIndex].queries += day.queries;
+      weeks[weekIndex].tokens += day.tokens;
+      weeks[weekIndex].cost += day.cost;
+      if (day.avgLatency > 0) {
+        weeks[weekIndex].latencySum += day.avgLatency;
+        weeks[weekIndex].latencyCount += 1;
+      }
+      return weeks;
+    }, []).map(week => ({
+      ...week,
+      avgLatency: week.latencyCount > 0 ? week.latencySum / week.latencyCount : 0,
+    }));
+
+    const monthly = daily.reduce((months: any[], day) => {
+      const monthKey = day.date.substring(0, 7); // YYYY-MM
+      let month = months.find(m => m.month === monthKey);
+      if (!month) {
+        month = {
+          month: monthKey,
+          queries: 0,
+          tokens: 0,
+          cost: 0,
+          avgLatency: 0,
+          latencySum: 0,
+          latencyCount: 0,
+        };
+        months.push(month);
+      }
+      month.queries += day.queries;
+      month.tokens += day.tokens;
+      month.cost += day.cost;
+      if (day.avgLatency > 0) {
+        month.latencySum += day.avgLatency;
+        month.latencyCount += 1;
+      }
+      return months;
+    }, []).map(month => ({
+      ...month,
+      avgLatency: month.latencyCount > 0 ? month.latencySum / month.latencyCount : 0,
+    }));
+
+    const totalInputTokens = allRuns.reduce((sum, run) => sum + run.inputTokens, 0);
+    const totalOutputTokens = allRuns.reduce((sum, run) => sum + run.outputTokens, 0);
+    const averageCostPerQuery = totalQueries > 0 ? totalCostIncurred / totalQueries : 0;
+    const averageTokensPerQuery = totalQueries > 0 ? totalTokensUsed / totalQueries : 0;
+    const peakLatency = allRuns.length > 0 ? Math.max(...allRuns.map(r => r.latencyMs)) : 0;
+    const minLatency = allRuns.length > 0 ? Math.min(...allRuns.map(r => r.latencyMs)) : 0;
+
+    // Merge with mock data for comprehensive view
+    const mergedData: CumulativeAnalytics = {
+      totalQueries: mockData.totalQueries + totalQueries,
+      totalTokensUsed: mockData.totalTokensUsed + totalTokensUsed,
+      totalCostIncurred: mockData.totalCostIncurred + totalCostIncurred,
+      averageLatency: allRuns.length > 0 
+        ? (mockData.averageLatency + averageLatency) / 2 
+        : mockData.averageLatency,
+      successRate: allRuns.length > 0 
+        ? (mockData.successRate + successRate) / 2 
+        : mockData.successRate,
+      failureRate: allRuns.length > 0 
+        ? (mockData.failureRate + failureRate) / 2 
+        : mockData.failureRate,
+      modelUsageDistribution: [
+        ...mockData.modelUsageDistribution.map(model => ({
+          ...model,
+          queryCount: model.queryCount + (modelUsageDistribution.find(m => m.modelId === model.modelId)?.queryCount || 0),
+        })),
+        ...modelUsageDistribution.filter(model => 
+          !mockData.modelUsageDistribution.find(m => m.modelId === model.modelId)
+        ),
+      ].map(model => ({
+        ...model,
+        percentage: (model.queryCount / (mockData.totalQueries + totalQueries)) * 100,
+      })),
+      timeBasedTrends: {
+        daily: mockData.timeBasedTrends.daily.map(mockDay => {
+          const realDay = daily.find(d => d.date === mockDay.date);
+          if (realDay) {
+            return {
+              date: mockDay.date,
+              queries: mockDay.queries + realDay.queries,
+              tokens: mockDay.tokens + realDay.tokens,
+              cost: mockDay.cost + realDay.cost,
+              avgLatency: realDay.avgLatency > 0 
+                ? Math.round((mockDay.avgLatency + realDay.avgLatency) / 2)
+                : mockDay.avgLatency,
+            };
+          }
+          return mockDay;
+        }),
+        weekly: [...mockData.timeBasedTrends.weekly, ...weekly].slice(-8), // Keep last 8 weeks
+        monthly: [...mockData.timeBasedTrends.monthly, ...monthly].slice(-12), // Keep last 12 months
+      },
+      performanceMetrics: {
+        totalInputTokens: mockData.performanceMetrics.totalInputTokens + totalInputTokens,
+        totalOutputTokens: mockData.performanceMetrics.totalOutputTokens + totalOutputTokens,
+        averageCostPerQuery: (mockData.performanceMetrics.averageCostPerQuery + averageCostPerQuery) / 2,
+        averageTokensPerQuery: (mockData.performanceMetrics.averageTokensPerQuery + averageTokensPerQuery) / 2,
+        peakLatency: Math.max(mockData.performanceMetrics.peakLatency, peakLatency),
+        minLatency: Math.min(mockData.performanceMetrics.minLatency, minLatency || mockData.performanceMetrics.minLatency),
+      },
+    };
+
+    return mergedData;
+  }, [sessions]);
+
   return {
     sessions,
     currentSession,
@@ -363,6 +585,7 @@ export function useAIPlatform() {
     recommendations,
     promptSuggestions,
     analytics,
+    cumulativeAnalytics,
     confidence,
     divergence,
     createSession,

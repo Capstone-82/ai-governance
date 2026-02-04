@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion';
 import { Session } from '@/types/ai-platform';
-import { Plus, MessageSquare, Sparkles, Clock, DollarSign } from 'lucide-react';
+import { Plus, MessageSquare, Sparkles, Clock, DollarSign, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 interface SessionSidebarProps {
   sessions: Session[];
@@ -18,6 +19,8 @@ export function SessionSidebar({
   onSelectSession, 
   onNewSession 
 }: SessionSidebarProps) {
+  const navigate = useNavigate();
+
   return (
     <aside className="w-72 bg-sidebar border-r border-sidebar-border flex flex-col h-full">
       {/* Header */}
@@ -33,11 +36,19 @@ export function SessionSidebar({
         </div>
         <Button 
           onClick={onNewSession}
-          className="w-full bg-sidebar-accent hover:bg-sidebar-accent/80 text-sidebar-foreground border-sidebar-border"
+          className="w-full bg-sidebar-accent hover:bg-sidebar-accent/80 text-sidebar-foreground border-sidebar-border mb-2"
           variant="outline"
         >
           <Plus className="w-4 h-4 mr-2" />
           New Session
+        </Button>
+        <Button 
+          onClick={() => navigate('/analytics')}
+          className="w-full bg-sidebar-accent hover:bg-sidebar-accent/80 text-sidebar-foreground border-sidebar-border"
+          variant="outline"
+        >
+          <BarChart3 className="w-4 h-4 mr-2" />
+          Overall Analytics
         </Button>
       </div>
 

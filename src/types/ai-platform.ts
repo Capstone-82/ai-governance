@@ -103,6 +103,53 @@ export interface AnalyticsData {
   }[];
 }
 
+export interface CumulativeAnalytics {
+  totalQueries: number;
+  totalTokensUsed: number;
+  totalCostIncurred: number;
+  averageLatency: number;
+  successRate: number;
+  failureRate: number;
+  modelUsageDistribution: {
+    modelId: string;
+    modelName: string;
+    queryCount: number;
+    percentage: number;
+    color: string;
+  }[];
+  timeBasedTrends: {
+    daily: {
+      date: string;
+      queries: number;
+      tokens: number;
+      cost: number;
+      avgLatency: number;
+    }[];
+    weekly: {
+      week: string;
+      queries: number;
+      tokens: number;
+      cost: number;
+      avgLatency: number;
+    }[];
+    monthly: {
+      month: string;
+      queries: number;
+      tokens: number;
+      cost: number;
+      avgLatency: number;
+    }[];
+  };
+  performanceMetrics: {
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    averageCostPerQuery: number;
+    averageTokensPerQuery: number;
+    peakLatency: number;
+    minLatency: number;
+  };
+}
+
 export interface DecisionConfidence {
   score: number;
   level: 'low' | 'medium' | 'high';
