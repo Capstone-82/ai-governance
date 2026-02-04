@@ -1,0 +1,39 @@
+{
+  "id": "a5326c60-7749-4fc6-8d96-04a4ffad83cc",
+  "trace_id": "1ae971a8-53ba-4473-b325-8f962fd0e10d",
+  "provider": "aws",
+  "model_id": "anthropic.claude-3-sonnet-20240229-v1:0",
+  "client_id": null,
+  "user_id": null,
+  "tags": {
+    "environment": "dev",
+    "purpose": "governance_check"
+  },
+  "started_at": "2026-02-04T09:23:41.174080",
+  "ended_at": "2026-02-04T09:23:45.455471",
+  "usage": {
+    "input_tokens": 12,
+    "output_tokens": 100,
+    "total_tokens": 112,
+    "latency_ms": 4281.3910000000005,
+    "total_tokens_calc": 112
+  },
+  "cost": {
+    "input_cost": 0.00012000000000000002,
+    "output_cost": 0.003,
+    "total_cost": 0.00312,
+    "currency": "USD"
+  },
+  "accuracy": {
+    "score": 0.9,
+    "rationale": "Automated check passed",
+    "evaluator_model": "none"
+  },
+  "status": "completed",
+  "success": true,
+  "error_message": null,
+  "input_prompt": "is my bucket public?",
+  "response_text": "I'm afraid I don't have enough context to determine if a specific bucket is public or not. Cloud storage services like Amazon S3 allow you to configure access permissions for buckets, making them either public (accessible by anyone on the internet) or private. Without more details about which bucket or cloud provider you're asking about, I can't provide a definitive answer. In general, it's a best practice to keep storage buckets private unless you explicitly need public access.",
+  "input_hash": null,
+  "output_hash": null
+}

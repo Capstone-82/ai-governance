@@ -1,0 +1,37 @@
+# Virtual Environment
+backend/venv/
+backend/.venv/
+
+# Environment Variables
+backend/.env
+backend/.env.local
+
+# Database
+backend/database.db
+backend/*.db
+backend/*.sqlite
+backend/*.sqlite3
+
+# Python Cache
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.py[cod]
+backend/*$py.class
+backend/*.so
+
+# Testing
+backend/.pytest_cache/
+backend/.coverage
+backend/htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,143 @@
+{
+  "provider": "Meta",
+  "currency": "USD",
+  "pricing_unit": "per_1000_tokens",
+  "region": "us-east-1",
+  "models": {
+    "llama_4": [
+      {
+        "model": "Llama 4 Maverick 17B",
+        "on_demand": {
+          "input": 0.00024,
+          "output": 0.00097
+        },
+        "batch": {
+          "input": 0.00012,
+          "output": 0.000485
+        }
+      },
+      {
+        "model": "Llama 4 Scout 17B",
+        "on_demand": {
+          "input": 0.00017,
+          "output": 0.00066
+        },
+        "batch": {
+          "input": 0.000085,
+          "output": 0.00033
+        }
+      }
+    ],
+    "llama_3_3": [
+      {
+        "model": "Llama 3.3 Instruct 70B",
+        "on_demand": {
+          "input": 0.00072,
+          "output": 0.00072
+        },
+        "batch": {
+          "input": 0.00036,
+          "output": 0.00036
+        }
+      }
+    ],
+    "llama_3_2": [
+      {
+        "model": "Llama 3.2 Instruct 1B",
+        "on_demand": {
+          "input": 0.00010,
+          "output": 0.00010
+        },
+        "batch": null
+      },
+      {
+        "model": "Llama 3.2 Instruct 3B",
+        "on_demand": {
+          "input": 0.00015,
+          "output": 0.00015
+        },
+        "batch": null
+      },
+      {
+        "model": "Llama 3.2 Instruct 11B",
+        "on_demand": {
+          "input": 0.00016,
+          "output": 0.00016
+        },
+        "batch": null
+      },
+      {
+        "model": "Llama 3.2 Instruct 90B",
+        "on_demand": {
+          "input": 0.00072,
+          "output": 0.00072
+        },
+        "batch": null
+      }
+    ],
+    "llama_3_1": [
+      {
+        "model": "Llama 3.1 Instruct 8B",
+        "on_demand": {
+          "input": 0.00022,
+          "output": 0.00022
+        },
+        "batch": {
+          "input": 0.00011,
+          "output": 0.00011
+        }
+      },
+      {
+        "model": "Llama 3.1 Instruct 70B",
+        "on_demand": {
+          "input": 0.00072,
+          "output": 0.00072
+        },
+        "batch": {
+          "input": 0.00036,
+          "output": 0.00036
+        }
+      },
+      {
+        "model": "Llama 3.1 Instruct 70B (latency optimized)",
+        "on_demand": {
+          "input": 0.00090,
+          "output": 0.00090
+        },
+        "batch": null
+      }
+    ],
+    "llama_3": [
+      {
+        "model": "Llama 3 Instruct 8B",
+        "on_demand": {
+          "input": 0.00030,
+          "output": 0.00060
+        }
+      },
+      {
+        "model": "Llama 3 Instruct 70B",
+        "on_demand": {
+          "input": 0.00265,
+          "output": 0.00350
+        }
+      }
+    ],
+    "llama_2": [
+      {
+        "model": "Llama 2 Chat 13B",
+        "on_demand": {
+          "input": 0.00075,
+          "output": 0.00100
+        }
+      },
+      {
+        "model": "Llama 2 Chat 70B",
+        "on_demand": {
+          "input": 0.00195,
+          "output": 0.00256
+        }
+      }
+    ]
+  }
+}
