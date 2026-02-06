@@ -1,10 +1,12 @@
 import { AIModel } from '@/types/ai-platform';
 
 export const AI_MODELS: AIModel[] = [
+  // AWS Bedrock - Anthropic Claude
   {
-    id: 'claude-3-5-sonnet',
+    id: 'anthropic.claude-3-5-sonnet-20240620-v1:0',
     name: 'Claude 3.5 Sonnet',
     provider: 'anthropic',
+    hostPlatform: 'aws_bedrock',
     description: 'Most intelligent model, best for complex reasoning',
     contextWindow: 200000,
     inputCostPer1k: 0.003,
@@ -14,34 +16,39 @@ export const AI_MODELS: AIModel[] = [
     color: '#D97706',
   },
   {
-    id: 'claude-3-haiku',
+    id: 'anthropic.claude-3-sonnet-20240229-v1:0',
+    name: 'Claude 3 Sonnet',
+    provider: 'anthropic',
+    hostPlatform: 'aws_bedrock',
+    description: 'Balanced Claude model for general tasks',
+    contextWindow: 200000,
+    inputCostPer1k: 0.003,
+    outputCostPer1k: 0.015,
+    avgLatency: 2300,
+    capabilities: ['reasoning', 'code', 'analysis'],
+    color: '#F59E0B',
+  },
+  {
+    id: 'anthropic.claude-3-haiku-20240307-v1:0',
     name: 'Claude 3 Haiku',
     provider: 'anthropic',
+    hostPlatform: 'aws_bedrock',
     description: 'Fastest Claude model, great for simple tasks',
     contextWindow: 200000,
     inputCostPer1k: 0.00025,
     outputCostPer1k: 0.00125,
     avgLatency: 800,
     capabilities: ['speed', 'simple-tasks', 'classification'],
-    color: '#F59E0B',
+    color: '#FCD34D',
   },
+
+  // GCP Vertex AI - Gemini
   {
-    id: 'gemini-2-flash',
-    name: 'Gemini 2.0 Flash',
+    id: 'gemini-2.5-pro',
+    name: 'Gemini 2.5 Pro',
     provider: 'google',
-    description: 'Fast and efficient multimodal model',
-    contextWindow: 1000000,
-    inputCostPer1k: 0.0001,
-    outputCostPer1k: 0.0004,
-    avgLatency: 600,
-    capabilities: ['multimodal', 'speed', 'long-context'],
-    color: '#4285F4',
-  },
-  {
-    id: 'gemini-2-pro',
-    name: 'Gemini 2.0 Pro',
-    provider: 'google',
-    description: 'Best for complex reasoning and coding',
+    hostPlatform: 'gcp_vertex',
+    description: 'Strongest quality for code & complex prompts',
     contextWindow: 2000000,
     inputCostPer1k: 0.00125,
     outputCostPer1k: 0.005,
@@ -50,9 +57,38 @@ export const AI_MODELS: AIModel[] = [
     color: '#34A853',
   },
   {
+    id: 'gemini-2.5-flash',
+    name: 'Gemini 2.5 Flash',
+    provider: 'google',
+    hostPlatform: 'gcp_vertex',
+    description: 'Best for balancing reasoning and speed',
+    contextWindow: 1000000,
+    inputCostPer1k: 0.000075,
+    outputCostPer1k: 0.0003,
+    avgLatency: 600,
+    capabilities: ['multimodal', 'speed', 'long-context'],
+    color: '#4285F4',
+  },
+  {
+    id: 'gemini-2.5-flash-lite',
+    name: 'Gemini 2.5 Flash Lite',
+    provider: 'google',
+    hostPlatform: 'gcp_vertex',
+    description: 'Most balanced for low latency use cases',
+    contextWindow: 1000000,
+    inputCostPer1k: 0.0000375,
+    outputCostPer1k: 0.00015,
+    avgLatency: 400,
+    capabilities: ['speed', 'low-latency'],
+    color: '#8AB4F8',
+  },
+
+  // OpenAI
+  {
     id: 'gpt-4o',
     name: 'GPT-4o',
     provider: 'openai',
+    hostPlatform: 'openai',
     description: 'OpenAI flagship model, balanced performance',
     contextWindow: 128000,
     inputCostPer1k: 0.0025,
@@ -65,6 +101,7 @@ export const AI_MODELS: AIModel[] = [
     id: 'gpt-4o-mini',
     name: 'GPT-4o Mini',
     provider: 'openai',
+    hostPlatform: 'openai',
     description: 'Cost-effective for straightforward tasks',
     contextWindow: 128000,
     inputCostPer1k: 0.00015,
@@ -74,15 +111,31 @@ export const AI_MODELS: AIModel[] = [
     color: '#059669',
   },
   {
-    id: 'claude-bedrock',
-    name: 'Claude (Bedrock)',
+    id: 'o1',
+    name: 'O1',
+    provider: 'openai',
+    hostPlatform: 'openai',
+    description: 'Advanced reasoning model',
+    contextWindow: 128000,
+    inputCostPer1k: 0.015,
+    outputCostPer1k: 0.06,
+    avgLatency: 3000,
+    capabilities: ['reasoning', 'complex-problems'],
+    color: '#047857',
+  },
+
+  // AWS Bedrock - Meta Llama
+  {
+    id: 'meta.llama3-70b-instruct-v1:0',
+    name: 'Llama 3 70B',
     provider: 'amazon',
-    description: 'Claude via AWS Bedrock integration',
-    contextWindow: 200000,
-    inputCostPer1k: 0.003,
-    outputCostPer1k: 0.015,
-    avgLatency: 2800,
-    capabilities: ['aws-native', 'reasoning', 'enterprise'],
+    hostPlatform: 'aws_bedrock',
+    description: 'Open-source model via AWS Bedrock',
+    contextWindow: 8000,
+    inputCostPer1k: 0.00099,
+    outputCostPer1k: 0.00099,
+    avgLatency: 1500,
+    capabilities: ['reasoning', 'open-source'],
     color: '#FF9900',
   },
 ];
@@ -93,4 +146,8 @@ export const getModelById = (id: string): AIModel | undefined => {
 
 export const getModelsByProvider = (provider: string): AIModel[] => {
   return AI_MODELS.filter(model => model.provider === provider);
+};
+
+export const getModelsByPlatform = (platform: string): AIModel[] => {
+  return AI_MODELS.filter(model => model.hostPlatform === platform);
 };

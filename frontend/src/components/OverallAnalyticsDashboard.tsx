@@ -278,8 +278,23 @@ export function OverallAnalyticsDashboard({ data }: OverallAnalyticsDashboardPro
                   <BarChart data={data.modelMetrics}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="modelName" tick={{ fontSize: 11 }} />
-                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(val) => `${(val * 100).toFixed(0)}%`} domain={[0.8, 1]} />
-                    <Tooltip content={<CustomTooltip />} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(val) => `${(val * 100).toFixed(0)}%`} domain={[0.9, 1]} />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-popover border border-border rounded-lg shadow-sm p-3">
+                              <p className="text-sm font-medium text-foreground">{data.modelName}</p>
+                              <p className="text-sm text-muted-foreground">
+                                Accuracy: <span className="font-medium text-foreground">{(data.accuracy * 100).toFixed(1)}%</span>
+                              </p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
                     <Bar dataKey="accuracy" name="Accuracy" radius={[4, 4, 0, 0]} barSize={40}>
                       {data.modelMetrics.map((entry, index) => (
                         <Cell key={`cell-acc-${index}`} fill={entry.color} fillOpacity={0.8} />

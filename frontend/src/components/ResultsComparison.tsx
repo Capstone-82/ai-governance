@@ -78,12 +78,18 @@ export function ModelResultCard({ run, index, isRecommended, recommendationType 
               <Coins className="w-3.5 h-3.5 text-muted-foreground" />
               <span className="font-medium text-foreground/80">${run.cost.toFixed(5)}</span>
             </div>
-            <div className="flex items-center gap-2 text-xs col-span-2">
+            <div className="flex items-center gap-2 text-xs">
               <FileText className="w-3.5 h-3.5 text-muted-foreground" />
               <span className="text-muted-foreground">
                 <span className="text-foreground/80">{run.inputTokens}</span> in · <span className="text-foreground/80">{run.outputTokens}</span> out
               </span>
             </div>
+            {run.accuracy !== undefined && (
+              <div className="flex items-center gap-2 text-xs">
+                <Sparkles className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="font-medium text-foreground/80">{run.accuracy}% accuracy</span>
+              </div>
+            )}
           </div>
         </CardHeader>
 
