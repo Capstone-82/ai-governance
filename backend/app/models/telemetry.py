@@ -27,6 +27,8 @@ class GovernanceTelemetry(SQLModel, table=True):
     # Accuracy / Quality (aggregated here for easy dashboard queries)
     accuracy_score: float = Field(default=0.0)
     accuracy_rationale: Optional[str] = None
+    query_category: Optional[str] = None
+    prompt_optimization: Optional[str] = None
     
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     

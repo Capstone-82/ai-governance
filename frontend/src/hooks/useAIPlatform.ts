@@ -146,6 +146,8 @@ export function useAIPlatform() {
         query: prompt,
         governance_context: governanceContext,
         models: backendModels,
+        guardrailId: config.guardrailId,
+        evaluatorModel: config.evaluatorModel,
       });
 
       // Convert backend responses to frontend ModelRun format
@@ -167,6 +169,8 @@ export function useAIPlatform() {
           error: log.error_message,
           accuracy: log.accuracy.score,
           accuracyRationale: log.accuracy.rationale,
+          queryCategory: log.accuracy.query_category,
+          promptOptimization: log.accuracy.prompt_optimization,
         };
       });
 
@@ -206,9 +210,46 @@ export function useAIPlatform() {
 
     } catch (error) {
       console.error('Execution error:', error);
+
+      let errorMessage = "Failed to execute prompt";
+      let errorTitle = "Error";
+
+      if (error instanceof Error) {
+        // Check if it's a JSON error string from our API wrapper
+        // e.g. "Guardrail Violation: ..." or explicit JSON format
+        errorMessage = error.message;
+
+        // 1. Clean up "API Error (400): " prefix from api.ts
+        if (errorMessage.includes("API Error")) {
+          const parts = errorMessage.split("): ");
+          if (parts.length > 1) {
+            errorMessage = parts[1];
+          }
+        }
+
+        // 2. Parse JSON content if present (e.g. {"detail": "..."})
+        try {
+          if (errorMessage.trim().startsWith("{")) {
+            const json = JSON.parse(errorMessage);
+            if (json.detail) {
+              errorMessage = json.detail;
+            }
+          }
+        } catch (e) {
+          // Not valid JSON, keep original string
+        }
+
+        // 3. Specialized handling for Guardrail Violations
+        if (errorMessage.includes("Guardrail Violation")) {
+          errorTitle = "Blocked by Guardrail";
+          // Remove the technical prefix if present
+          errorMessage = errorMessage.replace("Guardrail Violation:", "").trim();
+        }
+      }
+
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to execute prompt",
+        title: errorTitle,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

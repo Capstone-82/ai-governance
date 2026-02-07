@@ -28,6 +28,8 @@ export interface ModelRun {
   error?: string;
   accuracy?: number; // 0-100 score from backend
   accuracyRationale?: string;
+  queryCategory?: string;
+  promptOptimization?: string;
 }
 
 export interface Message {
@@ -197,4 +199,6 @@ export interface ExecutionConfig {
   selectedModels: string[];
   useHistory: boolean;
   maxBudget?: number;
+  guardrailId?: string;
+  evaluatorModel?: string;
 }

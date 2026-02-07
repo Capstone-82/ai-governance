@@ -13,6 +13,8 @@ export interface BatchGovernanceRequest {
     query: string;
     governance_context: 'aws' | 'azure' | 'gcp';
     models: BackendModelConfig[];
+    guardrailId?: string;
+    evaluatorModel?: string;
 }
 
 export interface UsageMetrics {
@@ -32,6 +34,8 @@ export interface AccuracyMetrics {
     score: number; // 0-100
     rationale: string;
     evaluator_model: string;
+    query_category?: string;
+    prompt_optimization?: string;
 }
 
 export interface GovernanceLog {
@@ -72,6 +76,8 @@ export interface MessageDetail {
         total_cost: number;
         accuracy_score: number;
         accuracy_rationale?: string;
+        query_category?: string;
+        prompt_optimization?: string;
         timestamp: string;
     };
 }
@@ -142,7 +148,18 @@ async function apiCall<T>(
 
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(`API Error (${response.status}): ${errorText}`);
+
+            // Try formatting error as JSON for cleaner feedback
+            try {
+                const json = JSON.parse(errorText);
+                if (json.detail) {
+                    throw new Error(json.detail);
+                }
+            } catch (e) {
+                // Ignore JSON parse errors and throw raw text
+            }
+
+            throw new Error(`API Error (${response.status}): ${errorText.substring(0, 100)}`);
         }
 
         return await response.json();
@@ -164,9 +181,24 @@ export const governanceAPI = {
      * Analyze governance query with multiple models in parallel
      */
     async batchAnalyze(request: BatchGovernanceRequest): Promise<GovernanceLog[]> {
+        const { guardrailId, evaluatorModel, ...body } = request;
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+
+        if (guardrailId) {
+            headers['x-aws-guardrail-id'] = guardrailId;
+        }
+
+        const requestBody = {
+            ...body,
+            evaluator_model: evaluatorModel || 'gemini-2.5-pro'
+        };
+
         return apiCall<GovernanceLog[]>('/api/v1/governance/analyze/batch', {
             method: 'POST',
-            body: JSON.stringify(request),
+            headers,
+            body: JSON.stringify(requestBody),
         });
     },
 

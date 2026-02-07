@@ -26,7 +26,7 @@ bedrock_service = BedrockService()
 openai_service = OpenAIProvider()
 vertex_service = VertexProvider()
 
-def analyze_governance(query: str, provider_str: str, model_id: str, conversation_id: Optional[str] = None) -> GovernanceLog:
+def analyze_governance(query: str, provider_str: str, model_id: str, conversation_id: Optional[str] = None, evaluator_model: str = "gemini-2.5-pro") -> GovernanceLog:
     """
     Orchestrates the AI analysis and persists the result.
     """
@@ -114,15 +114,17 @@ def analyze_governance(query: str, provider_str: str, model_id: str, conversatio
         total_cost=cost_data["total_cost"]
     )
 
-    # Calculate Real Accuracy using Gemini
+    # Calculate Real Accuracy using selected Evaluator
     accuracy_data = {"score": 0, "rationale": "Evaluation skipped (failed)"}
     if success:
-        accuracy_data = evaluator_service.evaluate_response(query, response_text)
+        accuracy_data = evaluator_service.evaluate_response(query, response_text, model_id=evaluator_model)
     
     accuracy = AccuracyMetrics(
         score=accuracy_data.get("score", 0),
         rationale=accuracy_data.get("rationale", "No rationale provided"),
-        evaluator_model="gemini-2.5-pro"
+        evaluator_model=evaluator_model,
+        query_category=accuracy_data.get("query_category"),
+        prompt_optimization=accuracy_data.get("prompt_optimization")
     )
 
     # Create the log entry (Transient Pydantic Object)
@@ -150,7 +152,7 @@ def analyze_governance(query: str, provider_str: str, model_id: str, conversatio
     
     return log_entry
 
-async def analyze_governance_batch(query: str, configs: List[ModelConfig]) -> List[GovernanceLog]:
+async def analyze_governance_batch(query: str, configs: List[ModelConfig], evaluator_model: str = "gemini-2.5-pro") -> List[GovernanceLog]:
     loop = asyncio.get_running_loop()
     conv = db_service.create_conversation(title=query[:50])
     db_service.add_message(conv.id, "user", query)
@@ -164,7 +166,8 @@ async def analyze_governance_batch(query: str, configs: List[ModelConfig]) -> Li
                 query, 
                 config.host_platform, 
                 config.model_id,
-                conv.id 
+                conv.id,
+                evaluator_model
             )
             for config in configs
         ]

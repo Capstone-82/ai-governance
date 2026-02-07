@@ -47,6 +47,8 @@ class DBService:
                 total_cost=cost.get("total_cost", 0.0),
                 accuracy_score=accuracy.get("score", 0.0) if accuracy else 0.0,
                 accuracy_rationale=accuracy.get("rationale") if accuracy else None,
+                query_category=accuracy.get("query_category") if accuracy else None,
+                prompt_optimization=accuracy.get("prompt_optimization") if accuracy else None,
             )
             session.add(telemetry)
             session.commit()

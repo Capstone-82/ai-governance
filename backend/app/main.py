@@ -12,7 +12,18 @@ async def lifespan(app: FastAPI):
     yield
     # Shutdown logic (if any)
 
+from app.core.guardrail_middleware import BedrockGuardrailMiddleware
+
 app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
+
+# Add Guardrail Middleware
+# This runs BEFORE CORS, which is ok for blocking malicious content
+if settings.AWS_BEDROCK_GUARDRAIL_ID:
+    app.add_middleware(
+        BedrockGuardrailMiddleware,
+        guardrail_id=settings.AWS_BEDROCK_GUARDRAIL_ID,
+        guardrail_version=settings.AWS_BEDROCK_GUARDRAIL_VERSION
+    )
 
 # Configure CORS - MUST be added before routes
 app.add_middleware(

@@ -18,6 +18,22 @@ import { useSearchParams } from 'react-router-dom';
 import api from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 import { getModelById } from '@/data/models';
+import { GUARDRAILS } from '@/data/guardrails';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import {
+  generateAnalytics,
+  generateRecommendations,
+  generateConfidence,
+  generateDivergence
+} from '@/utils/analytics';
 
 const Index = () => {
   const { toast } = useToast();
@@ -49,11 +65,32 @@ const Index = () => {
     'gemini-2.5-flash',
     'gpt-4o',
   ]);
-  const [guardrailsEnabled, setGuardrailsEnabled] = useState(true);
+  const [guardrailsEnabled, setGuardrailsEnabled] = useState(false);
+  const [selectedGuardrail, setSelectedGuardrail] = useState<string>(GUARDRAILS[0].id);
+  const [selectedEvaluator, setSelectedEvaluator] = useState<string>('gemini-2.5-pro');
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
+
+  const EVALUATOR_MODELS = [
+    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro (Default)' },
+    { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro Preview' },
+    { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview' },
+    { id: 'gpt-5.2', name: 'GPT-5.2' },
+    { id: 'gpt-5-2025-08-07', name: 'GPT-5 (Aug 2025)' },
+  ];
   const [loadedMessages, setLoadedMessages] = useState<Message[]>([]);
   const [conversationTitle, setConversationTitle] = useState<string>('');
-  const [loadedAnalytics, setLoadedAnalytics] = useState<typeof analytics>(null);
+
+  const [loadedInsights, setLoadedInsights] = useState<{
+    analytics: typeof analytics;
+    recommendations: typeof recommendations;
+    confidence: typeof confidence;
+    divergence: typeof divergence;
+  }>({
+    analytics: null,
+    recommendations: [],
+    confidence: null,
+    divergence: null
+  });
 
   // Load conversation from backend when conversation ID is in URL
   useEffect(() => {
@@ -116,6 +153,8 @@ const Index = () => {
                 status: 'completed',
                 accuracy: tel.accuracy_score,
                 accuracyRationale: tel.accuracy_rationale,
+                queryCategory: tel.query_category,
+                promptOptimization: tel.prompt_optimization,
               });
             }
           }
@@ -173,6 +212,8 @@ const Index = () => {
           mode,
           selectedModels,
           useHistory: false,
+          guardrailId: guardrailsEnabled ? selectedGuardrail : undefined,
+          evaluatorModel: selectedEvaluator,
         });
       }, 0);
     } else {
@@ -180,6 +221,8 @@ const Index = () => {
         mode,
         selectedModels,
         useHistory: currentSession.messages.length > 0,
+        guardrailId: guardrailsEnabled ? selectedGuardrail : undefined,
+        evaluatorModel: selectedEvaluator,
       });
     }
   };
@@ -202,73 +245,23 @@ const Index = () => {
   // Generate analytics for loaded conversation
   useEffect(() => {
     if (loadedMessages.length > 0 && latestRuns.length > 0) {
-      const analyticsData = {
-        tokenComparison: latestRuns.map(run => {
-          const model = getModelById(run.modelId);
-          return {
-            modelId: run.modelId,
-            modelName: model?.name || run.modelId,
-            inputTokens: run.inputTokens,
-            outputTokens: run.outputTokens,
-            color: model?.color || '#888',
-          };
-        }),
-        latencyComparison: latestRuns.map(run => {
-          const model = getModelById(run.modelId);
-          return {
-            modelId: run.modelId,
-            modelName: model?.name || run.modelId,
-            latency: run.latencyMs,
-            color: model?.color || '#888',
-          };
-        }),
-        costComparison: latestRuns.map(run => {
-          const model = getModelById(run.modelId);
-          return {
-            modelId: run.modelId,
-            modelName: model?.name || run.modelId,
-            cost: run.cost,
-            color: model?.color || '#888',
-          };
-        }),
-        contextUsage: latestRuns.map(run => {
-          const model = getModelById(run.modelId);
-          return {
-            modelId: run.modelId,
-            modelName: model?.name || run.modelId,
-            used: run.inputTokens + run.outputTokens,
-            available: model?.contextWindow || 100000,
-            percentage: run.contextUsage,
-            color: model?.color || '#888',
-          };
-        }),
-        efficiencyScores: latestRuns.map(run => {
-          const model = getModelById(run.modelId);
-          const score = Math.round((run.outputTokens / run.inputTokens) * (1000 / run.latencyMs) * (0.01 / run.cost) * 100);
-          return {
-            modelId: run.modelId,
-            modelName: model?.name || run.modelId,
-            score: Math.min(100, Math.max(0, score)),
-            color: model?.color || '#888',
-          };
-        }),
-        accuracyComparison: latestRuns.map(run => {
-          const model = getModelById(run.modelId);
-          return {
-            modelId: run.modelId,
-            modelName: model?.name || run.modelId,
-            accuracy: run.accuracy || 0,
-            color: model?.color || '#888',
-          };
-        }),
-      };
-      setLoadedAnalytics(analyticsData);
+      setLoadedInsights({
+        analytics: generateAnalytics(latestRuns),
+        recommendations: generateRecommendations(latestRuns),
+        confidence: generateConfidence(latestRuns),
+        divergence: generateDivergence(latestRuns)
+      });
     } else {
-      setLoadedAnalytics(null);
+      setLoadedInsights({
+        analytics: null,
+        recommendations: [],
+        confidence: null,
+        divergence: null
+      });
     }
   }, [loadedMessages, latestRuns]);
 
-  const displayAnalytics = loadedAnalytics || analytics;
+  const displayAnalytics = loadedInsights.analytics || analytics;
 
   // Find recommended model
   const speedRecommendation = recommendations.find(r => r.type === 'speed');
@@ -292,9 +285,59 @@ const Index = () => {
             <h2 className="font-semibold text-foreground">
               {currentSession ? currentSession.title : 'AI Cloud Governance'}
             </h2>
-            {/* Removed session stats and shortcuts */}
           </div>
 
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="guardrail-toggle"
+                checked={guardrailsEnabled}
+                onCheckedChange={setGuardrailsEnabled}
+              />
+              <Label htmlFor="guardrail-toggle" className="text-sm font-medium">
+                Guardrails
+              </Label>
+            </div>
+
+            {guardrailsEnabled && (
+              <Select
+                value={selectedGuardrail}
+                onValueChange={setSelectedGuardrail}
+              >
+                <SelectTrigger className="w-[180px] h-8 text-xs">
+                  <SelectValue placeholder="Select Guardrail" />
+                </SelectTrigger>
+                <SelectContent>
+                  {GUARDRAILS.map((g) => (
+                    <SelectItem key={g.id} value={g.id} className="text-xs">
+                      {g.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            <div className="h-6 w-px bg-border mx-2" />
+
+            <div className="flex items-center gap-2">
+              <Label className="text-sm font-medium text-muted-foreground">Judge:</Label>
+              <Select
+                value={selectedEvaluator}
+                onValueChange={setSelectedEvaluator}
+              >
+                <SelectTrigger className="w-[180px] h-8 text-xs">
+                  <SelectValue placeholder="Evaluator Model" />
+                </SelectTrigger>
+                <SelectContent>
+                  {EVALUATOR_MODELS.map((m) => (
+                    <SelectItem key={m.id} value={m.id} className="text-xs">
+                      {m.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </header>
 
         {/* Content Area */}
@@ -460,12 +503,13 @@ const Index = () => {
 
                       <TabsContent value="insights" className="mt-6">
                         <RecommendationsPanel
-                          recommendations={recommendations}
+                          recommendations={loadedInsights.recommendations.length > 0 ? loadedInsights.recommendations : recommendations}
                           promptSuggestions={promptSuggestions}
-                          confidence={confidence}
-                          divergence={divergence}
-                          analytics={analytics}
+                          confidence={loadedInsights.confidence || confidence}
+                          divergence={loadedInsights.divergence || divergence}
+                          analytics={loadedInsights.analytics || analytics}
                           cumulativeAnalytics={cumulativeAnalytics}
+                          modelRuns={latestRuns}
                         />
                       </TabsContent>
                     </Tabs>

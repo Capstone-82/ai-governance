@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
     GOOGLE_API_KEY: Optional[str] = None
+
+    # AWS Bedrock Guardrails
+    AWS_BEDROCK_GUARDRAIL_ID: Optional[str] = None
+    AWS_BEDROCK_GUARDRAIL_VERSION: str = "DRAFT"
     
     class Config:
         env_file = ".env"

@@ -7,6 +7,7 @@ class GovernanceRequest(BaseModel):
     governance_context: str = Field("aws", description="The cloud provider context (aws, azure, gcp)")
     host_platform: str = Field("aws_bedrock", description="The AI host platform (aws_bedrock, gcp_vertex, openai)")
     model_id: str
+    evaluator_model: Optional[str] = "gemini-2.5-pro"
 
 # Batch Request Components
 class ModelConfig(BaseModel):
@@ -17,6 +18,7 @@ class BatchGovernanceRequest(BaseModel):
     query: str
     governance_context: str = Field("aws", description="The cloud provider context (aws, azure, gcp)")
     models: List[ModelConfig]
+    evaluator_model: Optional[str] = "gemini-2.5-pro"
 
 class GovernanceResponse(BaseModel):
     result: str
