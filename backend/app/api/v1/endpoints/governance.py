@@ -30,7 +30,8 @@ async def analyze_batch_cloud_governance(request: BatchGovernanceRequest):
     try:
         results = await ai_engine.analyze_governance_batch(
             query=request.query,
-            configs=request.models
+            configs=request.models,
+            evaluator_model=request.evaluator_model
         )
         return results
     except Exception as e:

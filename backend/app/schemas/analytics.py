@@ -1,4 +1,4 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -25,6 +25,14 @@ class AccuracyTrend(BaseModel):
     model_id: str
     avg_accuracy: float
     request_count: int
+
+class ComplexityAnalysis(BaseModel):
+    query_category: str
+    model_id: str
+    request_count: int
+    avg_accuracy: float
+    avg_latency_ms: float
+    total_cost: float
 
 class AnalyticsSummary(BaseModel):
     total_requests: int

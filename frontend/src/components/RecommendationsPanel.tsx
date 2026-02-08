@@ -6,12 +6,13 @@ import {
   DecisionConfidence,
   DivergenceAnalysis,
   AnalyticsData,
-  CumulativeAnalytics
+  CumulativeAnalytics,
+  ModelRun
 } from '@/types/ai-platform';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { AlertTriangle, Trophy } from 'lucide-react';
+import { AlertTriangle, Trophy, Layers, Lightbulb } from 'lucide-react';
 
 
 
@@ -22,6 +23,7 @@ interface RecommendationsPanelProps {
   divergence: DivergenceAnalysis | null;
   analytics?: AnalyticsData | null;
   cumulativeAnalytics?: CumulativeAnalytics | null;
+  modelRuns?: ModelRun[];
 }
 
 export function RecommendationsPanel({
@@ -31,7 +33,22 @@ export function RecommendationsPanel({
   divergence,
   analytics,
   cumulativeAnalytics,
+  modelRuns,
 }: RecommendationsPanelProps) {
+
+  const getComplexityColor = (category: string) => {
+    const lower = category.toLowerCase();
+    if (lower.includes('advanced')) return 'bg-red-500/20 text-red-500 hover:bg-red-500/30';
+    if (lower.includes('mid-level') || lower.includes('mid level')) return 'bg-yellow-500/20 text-yellow-500 hover:bg-yellow-500/30';
+    return 'bg-green-500/20 text-green-500 hover:bg-green-500/30';
+  };
+
+  // Extract special insights (Category & Optimization) from the first model run that has them
+  // (Since they are query-level properties, all runs likely have the same or similar values from the single evaluator call)
+  const insightRun = modelRuns?.find(r => r.queryCategory || r.promptOptimization);
+  const queryCategory = insightRun?.queryCategory;
+  const optimizationTip = insightRun?.promptOptimization;
+
   const accuracyRanking = React.useMemo(() => {
     const source = cumulativeAnalytics?.modelMetrics?.length
       ? cumulativeAnalytics.modelMetrics.map(model => ({
@@ -75,7 +92,48 @@ export function RecommendationsPanel({
       {/* Model Recommendations */}
 
 
-      {/* Prompt Suggestions */}
+      {/* Query Classification */}
+      {queryCategory && (
+        <Card className="border border-border bg-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
+              <Layers className="w-4 h-4 text-primary" />
+              Query Complexity
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-3">
+              <Badge className={`text-sm px-3 py-1 border-0 ${getComplexityColor(queryCategory)}`}>
+                {queryCategory}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                Detected complexity level
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Prompt Optimization from Evaluator */}
+      {optimizationTip && (
+        <Card className="border border-border bg-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2 text-foreground">
+              <Lightbulb className="w-4 h-4 text-yellow-500" />
+              Evaluator Tip
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+              <p className="text-sm text-yellow-600 dark:text-yellow-400 font-medium">
+                {optimizationTip}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Prompt Suggestions (Static / Frontend Logic) */}
       {accuracyRanking.length > 0 && bestModel && (
         <Card className="border border-border bg-card">
           <CardHeader className="pb-3">

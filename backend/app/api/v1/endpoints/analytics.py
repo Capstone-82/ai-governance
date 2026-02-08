@@ -7,7 +7,8 @@ from app.schemas.analytics import (
     ModelPerformance, 
     CostBreakdown, 
     AccuracyTrend,
-    AnalyticsSummary
+    AnalyticsSummary,
+    ComplexityAnalysis
 )
 from datetime import datetime, timedelta
 
@@ -137,6 +138,42 @@ def get_accuracy_trends(
             model_id=row.model_id,
             avg_accuracy=round(row.avg_accuracy or 0, 2),
             request_count=row.request_count
+        )
+        for row in results
+    ]
+
+@router.get("/complexity-analysis", response_model=List[ComplexityAnalysis])
+def get_complexity_analysis(
+    session: Session = Depends(get_session)
+):
+    """
+    Get performance metrics grouped by query complexity category.
+    Allows comparing how models perform on 'Straightforward' vs 'Advanced' queries.
+    """
+    statement = (
+        select(
+            GovernanceTelemetry.query_category,
+            GovernanceTelemetry.model_id,
+            func.count(GovernanceTelemetry.id).label("request_count"),
+            func.avg(GovernanceTelemetry.accuracy_score).label("avg_accuracy"),
+            func.avg(GovernanceTelemetry.latency_ms).label("avg_latency_ms"),
+            func.sum(GovernanceTelemetry.total_cost).label("total_cost")
+        )
+        .where(GovernanceTelemetry.query_category != None)
+        .group_by(GovernanceTelemetry.query_category, GovernanceTelemetry.model_id)
+        .order_by(GovernanceTelemetry.query_category, func.avg(GovernanceTelemetry.accuracy_score).desc())
+    )
+    
+    results = session.exec(statement).all()
+    
+    return [
+        ComplexityAnalysis(
+            query_category=row.query_category,
+            model_id=row.model_id,
+            request_count=row.request_count,
+            avg_accuracy=round(row.avg_accuracy or 0, 2),
+            avg_latency_ms=round(row.avg_latency_ms or 0, 2),
+            total_cost=round(row.total_cost or 0, 6)
         )
         for row in results
     ]
