@@ -32,7 +32,8 @@ import {
   generateAnalytics,
   generateRecommendations,
   generateConfidence,
-  generateDivergence
+  generateDivergence,
+  analyzePrompt
 } from '@/utils/analytics';
 
 const Index = () => {
@@ -85,11 +86,13 @@ const Index = () => {
     recommendations: typeof recommendations;
     confidence: typeof confidence;
     divergence: typeof divergence;
+    promptSuggestions: typeof promptSuggestions;
   }>({
     analytics: null,
     recommendations: [],
     confidence: null,
-    divergence: null
+    divergence: null,
+    promptSuggestions: []
   });
 
   // Load conversation from backend when conversation ID is in URL
@@ -245,18 +248,24 @@ const Index = () => {
   // Generate analytics for loaded conversation
   useEffect(() => {
     if (loadedMessages.length > 0 && latestRuns.length > 0) {
+      const latestUserMsg = displayMessages
+        .filter(m => m.role === 'user')
+        .slice(-1)[0];
+
       setLoadedInsights({
         analytics: generateAnalytics(latestRuns),
         recommendations: generateRecommendations(latestRuns),
         confidence: generateConfidence(latestRuns),
-        divergence: generateDivergence(latestRuns)
+        divergence: generateDivergence(latestRuns),
+        promptSuggestions: latestUserMsg ? analyzePrompt(latestUserMsg.content) : []
       });
     } else {
       setLoadedInsights({
         analytics: null,
         recommendations: [],
         confidence: null,
-        divergence: null
+        divergence: null,
+        promptSuggestions: []
       });
     }
   }, [loadedMessages, latestRuns]);
@@ -378,25 +387,22 @@ const Index = () => {
                 {/* Analytics for loaded conversation */}
                 {latestRuns.length > 0 && (
                   <div className="space-y-6">
-                    <Tabs defaultValue="analytics" className="w-full">
-                      <TabsList className="grid w-full max-w-lg grid-cols-3">
-                        <TabsTrigger value="analytics" className="flex items-center gap-2">
-                          <BarChart3 className="w-4 h-4" />
-                          Analytics
-                        </TabsTrigger>
+
+                    <Tabs defaultValue="results" className="w-full">
+                      <TabsList className="grid w-full max-w-lg grid-cols-4">
                         <TabsTrigger value="results" className="flex items-center gap-2">
                           <Layers className="w-4 h-4" />
                           Results
+                        </TabsTrigger>
+                        <TabsTrigger value="analytics" className="flex items-center gap-2">
+                          <BarChart3 className="w-4 h-4" />
+                          Analytics
                         </TabsTrigger>
                         <TabsTrigger value="insights" className="flex items-center gap-2">
                           <Lightbulb className="w-4 h-4" />
                           Insights
                         </TabsTrigger>
                       </TabsList>
-
-                      <TabsContent value="analytics" className="mt-6">
-                        {displayAnalytics && <AnalyticsGraphs data={displayAnalytics} />}
-                      </TabsContent>
 
                       <TabsContent value="results" className="mt-6">
                         <ResultsComparison
@@ -406,29 +412,20 @@ const Index = () => {
                         />
                       </TabsContent>
 
+                      <TabsContent value="analytics" className="mt-6">
+                        {displayAnalytics && <AnalyticsGraphs data={displayAnalytics} />}
+                      </TabsContent>
+
                       <TabsContent value="insights" className="mt-6">
-                        <div className="grid gap-6">
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="p-4 border border-border rounded-lg">
-                              <div className="text-sm text-muted-foreground mb-1">Total Cost</div>
-                              <div className="text-2xl font-bold">
-                                ${latestRuns.reduce((sum, run) => sum + run.cost, 0).toFixed(6)}
-                              </div>
-                            </div>
-                            <div className="p-4 border border-border rounded-lg">
-                              <div className="text-sm text-muted-foreground mb-1">Avg Latency</div>
-                              <div className="text-2xl font-bold">
-                                {Math.round(latestRuns.reduce((sum, run) => sum + run.latencyMs, 0) / latestRuns.length)}ms
-                              </div>
-                            </div>
-                            <div className="p-4 border border-border rounded-lg">
-                              <div className="text-sm text-muted-foreground mb-1">Avg Accuracy</div>
-                              <div className="text-2xl font-bold">
-                                {Math.round(latestRuns.reduce((sum, run) => sum + (run.accuracy || 0), 0) / latestRuns.length)}%
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                        <RecommendationsPanel
+                          recommendations={loadedInsights.recommendations}
+                          promptSuggestions={loadedInsights.promptSuggestions}
+                          confidence={loadedInsights.confidence}
+                          divergence={loadedInsights.divergence}
+                          analytics={loadedInsights.analytics}
+                          cumulativeAnalytics={cumulativeAnalytics}
+                          modelRuns={latestRuns}
+                        />
                       </TabsContent>
                     </Tabs>
                   </div>

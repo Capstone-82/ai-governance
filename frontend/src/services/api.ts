@@ -126,6 +126,15 @@ export interface AnalyticsSummary {
     most_cost_effective_model: string;
 }
 
+export interface ComplexityAnalysis {
+    query_category: string;
+    model_id: string;
+    request_count: number;
+    avg_accuracy: number;
+    avg_latency_ms: number;
+    total_cost: number;
+}
+
 // Helper function for API calls
 async function apiCall<T>(
     endpoint: string,
@@ -269,6 +278,13 @@ export const analyticsAPI = {
         return apiCall<AccuracyTrend[]>(
             `/api/v1/analytics/accuracy-trends?days=${days}`
         );
+    },
+
+    /**
+     * Get performance metrics grouped by query complexity
+     */
+    async getComplexityAnalysis(): Promise<ComplexityAnalysis[]> {
+        return apiCall<ComplexityAnalysis[]>('/api/v1/analytics/complexity-analysis');
     },
 
     /**

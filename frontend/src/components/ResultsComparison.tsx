@@ -16,6 +16,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useState } from 'react';
+import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 
 interface ModelResultCardProps {
   run: ModelRun;
@@ -112,8 +113,8 @@ export function ModelResultCard({ run, index, isRecommended, recommendationType 
                 className="overflow-hidden"
               >
                 <div className="px-4 pb-4 pt-1">
-                  <div className="bg-muted/30 rounded-lg p-3 text-sm leading-relaxed text-foreground/90 font-normal">
-                    {run.response}
+                  <div className="bg-muted/30 rounded-lg p-3 text-sm leading-relaxed text-foreground/90 font-normal max-h-[500px] overflow-y-auto">
+                    <MarkdownRenderer content={run.response} />
                   </div>
                 </div>
               </motion.div>

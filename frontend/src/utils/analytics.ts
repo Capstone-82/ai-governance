@@ -183,3 +183,31 @@ export const generateDivergence = (runs: ModelRun[]): DivergenceAnalysis => {
         modelComparisons: comparisons,
     };
 };
+
+export const analyzePrompt = (prompt: string): PromptSuggestion[] => {
+    const suggestions: PromptSuggestion[] = [];
+
+    if (prompt.length > 500) {
+        suggestions.push({
+            id: generateId(),
+            type: 'length',
+            original: prompt.slice(0, 100) + '...',
+            suggested: 'Consider breaking into smaller, focused prompts',
+            tokenSavings: Math.round(prompt.length * 0.15 / 4),
+            description: 'Long prompts can be optimized by removing redundant context',
+        });
+    }
+
+    if (prompt.includes('please') || prompt.includes('kindly') || prompt.includes('would you')) {
+        suggestions.push({
+            id: generateId(),
+            type: 'redundancy',
+            original: 'Polite phrases detected',
+            suggested: 'Use direct instructions for token efficiency',
+            tokenSavings: Math.round(15),
+            description: 'Removing conversational phrases saves tokens without affecting output',
+        });
+    }
+
+    return suggestions;
+};

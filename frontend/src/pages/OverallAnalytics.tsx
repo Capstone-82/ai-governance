@@ -36,9 +36,10 @@ const OverallAnalytics = () => {
     setIsLoading(true);
     try {
       // Fetch all analytics data from backend
-      const [modelPerformance, summary] = await Promise.all([
+      const [modelPerformance, summary, complexityAnalysis] = await Promise.all([
         api.analytics.getModelPerformance(),
         api.analytics.getSummary(),
+        api.analytics.getComplexityAnalysis(),
       ]);
 
       // Transform backend data to frontend format
@@ -55,6 +56,20 @@ const OverallAnalytics = () => {
           color: model?.color || '#888',
         };
       });
+
+      const complexityMetrics = complexityAnalysis.map(perf => {
+        const model = getModelById(perf.model_id);
+        return {
+          queryCategory: perf.query_category,
+          modelId: perf.model_id,
+          modelName: model?.name || perf.model_id,
+          requestCount: perf.request_count,
+          avgAccuracy: perf.avg_accuracy,
+          avgLatency: perf.avg_latency_ms,
+          totalCost: perf.total_cost,
+          color: model?.color || '#888',
+        };
+      }).sort((a, b) => a.queryCategory.localeCompare(b.queryCategory)); // Sort by category to group them visually
 
       // Calculate model usage distribution
       const totalRequests = modelPerformance.reduce((sum, m) => sum + m.total_requests, 0);
@@ -102,6 +117,7 @@ const OverallAnalytics = () => {
           minLatency: Math.min(...modelPerformance.map(m => m.avg_latency_ms)),
         },
         modelMetrics,
+        complexityAnalysis: complexityMetrics,
       };
 
       setAnalyticsData(cumulativeData);

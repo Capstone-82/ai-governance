@@ -168,6 +168,17 @@ export interface CumulativeAnalytics {
     accuracy: number;
     totalCost: number;
     color: string;
+    todayCost?: number;
+  }[];
+  complexityAnalysis: {
+    queryCategory: string;
+    modelId: string;
+    modelName: string;
+    requestCount: number;
+    avgAccuracy: number;
+    avgLatency: number;
+    totalCost: number;
+    color: string;
   }[];
 }
 
