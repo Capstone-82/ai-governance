@@ -73,7 +73,7 @@ export function ModelResultCard({ run, index, isRecommended, recommendationType 
           <div className="grid grid-cols-2 gap-y-2 gap-x-4 mt-4 pt-3 border-t border-border/50">
             <div className="flex items-center gap-2 text-xs">
               <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="font-medium text-foreground/80">{run.latencyMs}ms</span>
+              <span className="font-medium text-foreground/80">{Math.round(run.latencyMs)}ms</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
               <Coins className="w-3.5 h-3.5 text-muted-foreground" />
@@ -113,7 +113,7 @@ export function ModelResultCard({ run, index, isRecommended, recommendationType 
                 className="overflow-hidden"
               >
                 <div className="px-4 pb-4 pt-1">
-                  <div className="bg-muted/30 rounded-lg p-3 text-sm leading-relaxed text-foreground/90 font-normal max-h-[500px] overflow-y-auto">
+                  <div className="bg-muted/30 rounded-lg p-3 text-sm leading-relaxed text-foreground/90 font-normal max-h-[500px] overflow-y-auto break-words overflow-wrap-anywhere">
                     <MarkdownRenderer content={run.response} />
                   </div>
                 </div>

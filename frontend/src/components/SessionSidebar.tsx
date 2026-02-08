@@ -99,6 +99,7 @@ export function SessionSidebar({
       },
       cancel: {
         label: 'Cancel',
+        onClick: () => {},
       },
       duration: 5000,
     });
@@ -216,16 +217,28 @@ export function SessionSidebar({
               return (
                 <Tooltip key={itemId} delayDuration={0}>
                   <TooltipTrigger asChild>
-                    <motion.button
+                    <motion.div
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.05 }}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => {
                         if (isBackendConversation) {
                           // Navigate to main page - will need to load conversation details
                           navigate(`/?conversation=${itemId}`);
                         } else {
                           onSelectSession(item as Session);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          if (isBackendConversation) {
+                            navigate(`/?conversation=${itemId}`);
+                          } else {
+                            onSelectSession(item as Session);
+                          }
                         }
                       }}
                       onContextMenu={(e) => {
@@ -235,7 +248,7 @@ export function SessionSidebar({
                         }
                       }}
                       className={cn(
-                        "group w-full text-left rounded-xl transition-colors duration-200 border overflow-hidden",
+                        "group w-full text-left rounded-xl transition-colors duration-200 border overflow-hidden cursor-pointer",
                         isCollapsed ? "p-2 flex justify-center" : "px-3 py-2.5",
                         currentSession?.id === itemId
                           ? "bg-primary/10 border-primary/30 relative before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-primary"
@@ -324,7 +337,7 @@ export function SessionSidebar({
                           </div>
                         )}
                       </div>
-                    </motion.button>
+                    </motion.div>
                   </TooltipTrigger>
                   {isCollapsed && (
                     <TooltipContent side="right" className="flex flex-col gap-1">

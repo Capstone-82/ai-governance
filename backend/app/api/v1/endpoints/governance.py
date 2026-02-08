@@ -15,7 +15,8 @@ def analyze_cloud_governance(request: GovernanceRequest):
         log_entry = ai_engine.analyze_governance(
             query=request.query, 
             provider_str=request.host_platform, 
-            model_id=request.model_id
+            model_id=request.model_id,
+            governance_context=request.governance_context
         )
         return log_entry
     except Exception as e:
@@ -31,7 +32,8 @@ async def analyze_batch_cloud_governance(request: BatchGovernanceRequest):
         results = await ai_engine.analyze_governance_batch(
             query=request.query,
             configs=request.models,
-            evaluator_model=request.evaluator_model
+            evaluator_model=request.evaluator_model,
+            governance_context=request.governance_context
         )
         return results
     except Exception as e:

@@ -9,12 +9,12 @@ import { RecommendationsPanel } from '@/components/RecommendationsPanel';
 import { WelcomeScreen } from '@/components/WelcomeScreen';
 import { MessageHistory } from '@/components/MessageHistory';
 import { useAIPlatform } from '@/hooks/useAIPlatform';
-import { ExecutionMode, Message, ModelRun } from '@/types/ai-platform';
+import { ExecutionMode, Message, ModelRun, Session } from '@/types/ai-platform';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart3, Lightbulb, Layers, ShieldCheck, Loader2 } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 import { getModelById } from '@/data/models';
@@ -39,6 +39,7 @@ import {
 const Index = () => {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const conversationId = searchParams.get('conversation');
 
   const {
@@ -177,6 +178,20 @@ const Index = () => {
         setLoadedMessages(messages);
         setConversationTitle(conversation.title);
 
+        // Sync with hook state so we can continue the conversation
+        const historicalSession: Session = {
+          id: conversation.id,
+          title: conversation.title,
+          createdAt: new Date(conversation.created_at),
+          updatedAt: new Date(),
+          messages: messages,
+          selectedModels: selectedModels,
+          totalTokens: messages.reduce((acc, m) => acc + (m.modelRuns?.reduce((sum, r) => sum + r.inputTokens + r.outputTokens, 0) || 0), 0),
+          totalCost: messages.reduce((acc, m) => acc + (m.modelRuns?.reduce((sum, r) => sum + r.cost, 0) || 0), 0),
+          isTokenOptimized: false,
+        };
+        setCurrentSession(historicalSession);
+
         toast({
           title: 'Conversation Loaded',
           description: `Loaded "${conversation.title}" with ${messages.length / 2} queries`,
@@ -207,31 +222,21 @@ const Index = () => {
   };
 
   const handleExecute = async (prompt: string, mode: ExecutionMode) => {
-    if (!currentSession) {
-      const session = createSession();
-      // Wait for session to be set
-      setTimeout(() => {
-        executePrompt(prompt, {
-          mode,
-          selectedModels,
-          useHistory: false,
-          guardrailId: guardrailsEnabled ? selectedGuardrail : undefined,
-          evaluatorModel: selectedEvaluator,
-        });
-      }, 0);
-    } else {
-      executePrompt(prompt, {
-        mode,
-        selectedModels,
-        useHistory: currentSession.messages.length > 0,
-        guardrailId: guardrailsEnabled ? selectedGuardrail : undefined,
-        evaluatorModel: selectedEvaluator,
-      });
-    }
+    // Use current session or create a new one synchronously
+    const session = currentSession || createSession();
+
+    executePrompt(prompt, {
+      mode,
+      selectedModels,
+      useHistory: session.messages.length > 0,
+      guardrailId: guardrailsEnabled ? selectedGuardrail : undefined,
+      evaluatorModel: selectedEvaluator,
+    }, session);  // Pass session explicitly
   };
 
   const handleNewSession = () => {
     createSession();
+    navigate('/');
   };
 
   const estimatedCost = estimateCost(
@@ -365,72 +370,6 @@ const Index = () => {
                   <p className="text-muted-foreground">Loading conversation...</p>
                 </div>
               </motion.div>
-            ) : conversationId && loadedMessages.length > 0 ? (
-              <motion.div
-                key="loaded-conversation"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="p-6 space-y-6"
-              >
-                {/* Conversation Title */}
-                <div className="border-b border-border pb-4">
-                  <h2 className="text-2xl font-bold text-foreground">{conversationTitle}</h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Viewing historical conversation
-                  </p>
-                </div>
-
-                {/* Message History */}
-                <MessageHistory messages={loadedMessages} />
-
-                {/* Analytics for loaded conversation */}
-                {latestRuns.length > 0 && (
-                  <div className="space-y-6">
-
-                    <Tabs defaultValue="results" className="w-full">
-                      <TabsList className="grid w-full max-w-lg grid-cols-4">
-                        <TabsTrigger value="results" className="flex items-center gap-2">
-                          <Layers className="w-4 h-4" />
-                          Results
-                        </TabsTrigger>
-                        <TabsTrigger value="analytics" className="flex items-center gap-2">
-                          <BarChart3 className="w-4 h-4" />
-                          Analytics
-                        </TabsTrigger>
-                        <TabsTrigger value="insights" className="flex items-center gap-2">
-                          <Lightbulb className="w-4 h-4" />
-                          Insights
-                        </TabsTrigger>
-                      </TabsList>
-
-                      <TabsContent value="results" className="mt-6">
-                        <ResultsComparison
-                          runs={latestRuns}
-                          recommendedModelId={speedRecommendation?.modelId}
-                          recommendationType={speedRecommendation?.title}
-                        />
-                      </TabsContent>
-
-                      <TabsContent value="analytics" className="mt-6">
-                        {displayAnalytics && <AnalyticsGraphs data={displayAnalytics} />}
-                      </TabsContent>
-
-                      <TabsContent value="insights" className="mt-6">
-                        <RecommendationsPanel
-                          recommendations={loadedInsights.recommendations}
-                          promptSuggestions={loadedInsights.promptSuggestions}
-                          confidence={loadedInsights.confidence}
-                          divergence={loadedInsights.divergence}
-                          analytics={loadedInsights.analytics}
-                          cumulativeAnalytics={cumulativeAnalytics}
-                          modelRuns={latestRuns}
-                        />
-                      </TabsContent>
-                    </Tabs>
-                  </div>
-                )}
-              </motion.div>
             ) : !currentSession ? (
               <motion.div
                 key="welcome"
@@ -448,6 +387,16 @@ const Index = () => {
                 exit={{ opacity: 0 }}
                 className="p-6 space-y-6"
               >
+                {/* Conversation Title (if viewing history) */}
+                {conversationId && conversationTitle && (
+                  <div className="border-b border-border pb-4">
+                    <h2 className="text-2xl font-bold text-foreground">{conversationTitle}</h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Viewing historical conversation
+                    </p>
+                  </div>
+                )}
+
                 {/* Message History */}
                 {currentSession.messages.length > 0 && (
                   <MessageHistory messages={currentSession.messages} />
@@ -493,10 +442,8 @@ const Index = () => {
                       </TabsContent>
 
                       <TabsContent value="analytics" className="mt-6">
-                        {analytics && <AnalyticsGraphs data={analytics} />}
+                        {displayAnalytics && <AnalyticsGraphs data={displayAnalytics} />}
                       </TabsContent>
-
-
 
                       <TabsContent value="insights" className="mt-6">
                         <RecommendationsPanel

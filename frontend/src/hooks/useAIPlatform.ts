@@ -84,6 +84,23 @@ export function useAIPlatform() {
     if (typeof window === 'undefined') return;
     if (currentSession) {
       sessionStorage.setItem(CURRENT_SESSION_KEY, currentSession.id);
+
+      // Auto-migrate stale IDs for current session
+      const staleToNew: Record<string, string> = {
+        'anthropic.claude-3-5-sonnet-20240620-v1:0': 'anthropic.claude-sonnet-4-20250514-v1:0',
+        'meta.llama4-maverick-17b-v1:0': 'meta.llama4-maverick-17b-instruct-v1:0',
+        'meta.llama4-scout-17b-v1:0': 'meta.llama4-scout-17b-instruct-v1:0'
+      };
+
+      const hasStale = currentSession.selectedModels.some(id => staleToNew[id]);
+      if (hasStale) {
+        const migrated = currentSession.selectedModels.map(id => staleToNew[id] || id);
+        setCurrentSession(prev => prev ? { ...prev, selectedModels: migrated } : null);
+
+        setSessions(prev => prev.map(s =>
+          s.id === currentSession.id ? { ...s, selectedModels: migrated } : s
+        ));
+      }
     } else {
       sessionStorage.removeItem(CURRENT_SESSION_KEY);
     }
@@ -97,7 +114,7 @@ export function useAIPlatform() {
       updatedAt: new Date(),
       messages: [],
       selectedModels: [
-        'anthropic.claude-3-5-sonnet-20240620-v1:0',
+        'anthropic.claude-sonnet-4-20250514-v1:0',
         'gemini-2.5-flash',
         'gpt-4o'
       ],
@@ -125,9 +142,12 @@ export function useAIPlatform() {
 
   const executePrompt = useCallback(async (
     prompt: string,
-    config: ExecutionConfig
+    config: ExecutionConfig,
+    session?: Session
   ) => {
-    if (!currentSession) return;
+    // Use provided session or fall back to currentSession
+    const targetSession = session || currentSession;
+    if (!targetSession) return;
 
     setIsExecuting(true);
 
@@ -191,17 +211,27 @@ export function useAIPlatform() {
 
       // Update session
       const updatedSession: Session = {
-        ...currentSession,
-        title: prompt.slice(0, 40) + (prompt.length > 40 ? '...' : ''),
+        ...targetSession,
+        title: targetSession.messages.length === 0
+          ? (prompt.slice(0, 40) + (prompt.length > 40 ? '...' : ''))
+          : targetSession.title,
         updatedAt: new Date(),
-        messages: [...currentSession.messages, userMessage, assistantMessage],
-        totalTokens: currentSession.totalTokens + modelRuns.reduce((sum, run) => sum + run.inputTokens + run.outputTokens, 0),
-        totalCost: currentSession.totalCost + modelRuns.reduce((sum, run) => sum + run.cost, 0),
-        isTokenOptimized: config.useHistory && currentSession.messages.length > 0,
+        messages: [...targetSession.messages, userMessage, assistantMessage],
+        totalTokens: targetSession.totalTokens + modelRuns.reduce((sum, run) => sum + run.inputTokens + run.outputTokens, 0),
+        totalCost: targetSession.totalCost + modelRuns.reduce((sum, run) => sum + run.cost, 0),
+        isTokenOptimized: config.useHistory && targetSession.messages.length > 0,
       };
 
       setCurrentSession(updatedSession);
-      setSessions(prev => prev.map(s => s.id === updatedSession.id ? updatedSession : s));
+
+      setSessions(prev => {
+        const index = prev.findIndex(s => s.id === updatedSession.id);
+        if (index >= 0) {
+          return prev.map(s => s.id === updatedSession.id ? updatedSession : s);
+        } else {
+          return [updatedSession, ...prev];
+        }
+      });
 
       // Generate analytics
       setAnalytics(generateAnalytics(modelRuns));
@@ -306,6 +336,7 @@ export function useAIPlatform() {
           peakLatency: 0,
           minLatency: 0,
         },
+        complexityAnalysis: [],
       };
     }
 
@@ -343,6 +374,7 @@ export function useAIPlatform() {
           peakLatency: 0,
           minLatency: 0,
         },
+        complexityAnalysis: [],
       };
     }
 
@@ -447,6 +479,7 @@ export function useAIPlatform() {
         peakLatency: Math.max(...allRuns.map(run => run.latencyMs)),
         minLatency: Math.min(...allRuns.map(run => run.latencyMs)),
       },
+      complexityAnalysis: [],  // Can be calculated from queryCategory if needed
     };
   }, [sessions]);
 

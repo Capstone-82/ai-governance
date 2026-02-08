@@ -38,7 +38,7 @@ class DBService:
             telemetry = GovernanceTelemetry(
                 message_id=message_id,
                 trace_id=log_data.get("trace_id"),
-                governance_context=log_data.get("tags", {}).get("purpose", "unknown"), # Mapping issue, fixing below
+                governance_context=log_data.get("tags", {}).get("governance_context", "unknown"),
                 host_platform=str(log_data.get("provider")),
                 model_id=log_data.get("model_id"),
                 latency_ms=usage.get("latency_ms", 0.0),

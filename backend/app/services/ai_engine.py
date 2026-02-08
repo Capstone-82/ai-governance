@@ -26,7 +26,14 @@ bedrock_service = BedrockService()
 openai_service = OpenAIProvider()
 vertex_service = VertexProvider()
 
-def analyze_governance(query: str, provider_str: str, model_id: str, conversation_id: Optional[str] = None, evaluator_model: str = "gemini-2.5-pro") -> GovernanceLog:
+def analyze_governance(
+    query: str, 
+    provider_str: str, 
+    model_id: str, 
+    conversation_id: Optional[str] = None, 
+    evaluator_model: str = "gemini-2.5-pro",
+    governance_context: str = "aws"
+) -> GovernanceLog:
     """
     Orchestrates the AI analysis and persists the result.
     """
@@ -57,6 +64,7 @@ def analyze_governance(query: str, provider_str: str, model_id: str, conversatio
     error_msg = None
     success = False
 
+    print(f"DEBUG: Starting analysis for {model_id} on {provider_str} (Context: {governance_context})")
     try:
         if provider == ModelProvider.AWS:
             result = bedrock_service.invoke_model(model_id, query)
@@ -86,6 +94,7 @@ def analyze_governance(query: str, provider_str: str, model_id: str, conversatio
             success = True
 
     except Exception as e:
+        print(f"ERROR: Model {model_id} ({provider_str}) failed: {str(e)}")
         error_msg = str(e)
         success = False
     
@@ -141,7 +150,7 @@ def analyze_governance(query: str, provider_str: str, model_id: str, conversatio
         status=InvocationStatus.COMPLETED if success else InvocationStatus.FAILED,
         success=success,
         error_message=error_msg,
-        tags={"environment": "dev", "purpose": "governance_check"},
+        tags={"environment": "dev", "governance_context": governance_context},
         input_prompt=query,
         response_text=response_text
     )
@@ -152,13 +161,20 @@ def analyze_governance(query: str, provider_str: str, model_id: str, conversatio
     
     return log_entry
 
-async def analyze_governance_batch(query: str, configs: List[ModelConfig], evaluator_model: str = "gemini-2.5-pro") -> List[GovernanceLog]:
+async def analyze_governance_batch(
+    query: str, 
+    configs: List[ModelConfig], 
+    evaluator_model: str = "gemini-2.5-pro",
+    governance_context: str = "aws"
+) -> List[GovernanceLog]:
     loop = asyncio.get_running_loop()
-    conv = db_service.create_conversation(title=query[:50])
+    
+    # 1. Create conversation first
+    conv = db_service.create_conversation(title=query[:100])
     db_service.add_message(conv.id, "user", query)
     
     tasks = []
-    with ThreadPoolExecutor(max_workers=len(configs) + 2) as executor:
+    with ThreadPoolExecutor(max_workers=max(len(configs), 1) + 2) as executor:
         futures = [
             loop.run_in_executor(
                 executor, 
@@ -167,10 +183,22 @@ async def analyze_governance_batch(query: str, configs: List[ModelConfig], evalu
                 config.host_platform, 
                 config.model_id,
                 conv.id,
-                evaluator_model
+                evaluator_model,
+                governance_context
             )
             for config in configs
         ]
-        results = await asyncio.gather(*futures)
         
-    return list(results)
+        # Use return_exceptions=True to prevent one failure from killing the batch
+        raw_results = await asyncio.gather(*futures, return_exceptions=True)
+        
+        results = []
+        for i, res in enumerate(raw_results):
+            if isinstance(res, Exception):
+                # This handles cases where analyze_governance itself crashed before its internal try-except
+                print(f"Batch Error for model {configs[i].model_id}: {res}")
+                # We could create a mock fail log here if needed
+            else:
+                results.append(res)
+        
+    return results
