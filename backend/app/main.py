@@ -16,6 +16,12 @@ from app.core.guardrail_middleware import BedrockGuardrailMiddleware
 
 app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
 
+@app.middleware("http")
+async def add_streaming_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Accel-Buffering"] = "no"
+    return response
+
 # Add Guardrail Middleware
 # This runs BEFORE CORS, which is ok for blocking malicious content
 app.add_middleware(

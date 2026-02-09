@@ -48,24 +48,36 @@ async def analyze_batch_stream(request: BatchGovernanceRequest):
     Stream results as each model completes (Server-Sent Events).
     Returns results progressively for better UX with many models.
     """
+    HEARTBEAT_INTERVAL = 15  # seconds; keep Cloud Run proxy connection alive
+
     async def event_generator():
         try:
             # Send initial metadata
             yield f"data: {json.dumps({'type': 'start', 'total': len(request.models)})}\n\n"
             
-            async for result in ai_engine.analyze_governance_stream(
+            stream = ai_engine.analyze_governance_stream(
                 query=request.query,
                 configs=request.models,
                 evaluator_model=request.evaluator_model,
                 governance_context=request.governance_context
-            ):
-                # Send each result as it completes
-                event_data = {
-                    'type': 'result',
-                    'data': result.model_dump(mode='json')
-                }
-                yield f"data: {json.dumps(event_data)}\n\n"
-                await asyncio.sleep(0)  # Allow other tasks to run
+            )
+
+            # Manual iteration so we can send heartbeat events during long model waits
+            while True:
+                try:
+                    result = await asyncio.wait_for(stream.__anext__(), timeout=HEARTBEAT_INTERVAL)
+                    # Send each result as it completes
+                    event_data = {
+                        'type': 'result',
+                        'data': result.model_dump(mode='json')
+                    }
+                    yield f"data: {json.dumps(event_data)}\n\n"
+                    await asyncio.sleep(0)  # Allow other tasks to run
+                except asyncio.TimeoutError:
+                    # SSE comment line as heartbeat to keep Cloud Run connection alive
+                    yield ": ping\n\n"
+                except StopAsyncIteration:
+                    break
             
             # Send completion event
             yield f"data: {json.dumps({'type': 'complete'})}\n\n"
