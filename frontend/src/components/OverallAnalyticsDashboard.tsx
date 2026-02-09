@@ -25,7 +25,8 @@ import {
   Activity,
   Brain,
   TrendingUp,
-  FileText
+  FileText,
+  Trophy
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -80,6 +81,87 @@ export function OverallAnalyticsDashboard({ data }: OverallAnalyticsDashboardPro
       }
     });
     return Array.from(map.entries()).map(([name, color]) => ({ name, color }));
+  }, [data.complexityAnalysis]);
+
+  // Calculate top 3 models for each complexity level
+  const topModelsByComplexity = React.useMemo(() => {
+    if (!data.complexityAnalysis || data.complexityAnalysis.length === 0) return [];
+
+    const categories = Array.from(new Set(data.complexityAnalysis.map(i => i.queryCategory)));
+
+    return categories.map(category => {
+      const modelsForCategory = data.complexityAnalysis.filter(i => i.queryCategory === category);
+
+      // Filter out models with too few queries (less than 3 for statistical significance)
+      const validModels = modelsForCategory.filter(m => m.requestCount >= 3);
+
+      // If no models have enough data, show all but with warning
+      const modelsToRank = validModels.length > 0 ? validModels : modelsForCategory;
+
+      // Find global min/max for normalization across ALL models in this category
+      const allAccuracies = modelsToRank.map(m => m.avgAccuracy || 0);
+      const allCosts = modelsToRank.map(m => m.totalCost / (m.requestCount || 1));
+      const allLatencies = modelsToRank.map(m => m.avgLatency || 0);
+
+      const minAccuracy = Math.min(...allAccuracies);
+      const maxAccuracy = Math.max(...allAccuracies);
+      const minCost = Math.min(...allCosts);
+      const maxCost = Math.max(...allCosts);
+      const minLatency = Math.min(...allLatencies);
+      const maxLatency = Math.max(...allLatencies);
+
+      // Calculate composite score for each model
+      const rankedModels = modelsToRank.map(model => {
+        const accuracy = model.avgAccuracy || 0;
+        const avgCost = model.totalCost / (model.requestCount || 1);
+        const latency = model.avgLatency || 0;
+        const queryCount = model.requestCount || 1;
+
+        // Normalize to 0-100 scale using min-max normalization
+        const accuracyScore = maxAccuracy > minAccuracy
+          ? ((accuracy - minAccuracy) / (maxAccuracy - minAccuracy)) * 100
+          : 100;
+
+        // Cost: Lower is better (inverted normalization)
+        const costScore = maxCost > minCost
+          ? ((maxCost - avgCost) / (maxCost - minCost)) * 100
+          : 100;
+
+        // Latency: Lower is better (inverted normalization)
+        const latencyScore = maxLatency > minLatency
+          ? ((maxLatency - latency) / (maxLatency - minLatency)) * 100
+          : 100;
+
+        // Base composite score: Accuracy 60%, Latency 30%, Cost 10%
+        const baseScore = (accuracyScore * 0.6) + (latencyScore * 0.3) + (costScore * 0.1);
+
+        // Apply confidence penalty for low query counts
+        // Use Wilson score interval approach: more queries = more confidence
+        // Penalty factor: sqrt(queryCount) / sqrt(maxQueryCount)
+        const maxQueryCount = Math.max(...modelsToRank.map(m => m.requestCount || 1));
+        const confidenceFactor = Math.sqrt(queryCount) / Math.sqrt(maxQueryCount);
+
+        // Final score with confidence weighting
+        const finalScore = baseScore * (0.5 + (0.5 * confidenceFactor));
+
+        return {
+          modelName: model.modelName,
+          color: model.color,
+          accuracy: accuracy,
+          avgCost: avgCost,
+          latency: latency,
+          requestCount: model.requestCount,
+          compositeScore: finalScore,
+          hasLowConfidence: queryCount < 5, // Flag for UI warning
+        };
+      }).sort((a, b) => b.compositeScore - a.compositeScore).slice(0, 3);
+
+      return {
+        category,
+        topModels: rankedModels,
+        hasInsufficientData: validModels.length === 0,
+      };
+    });
   }, [data.complexityAnalysis]);
 
   return (
@@ -407,6 +489,89 @@ export function OverallAnalyticsDashboard({ data }: OverallAnalyticsDashboardPro
 
         <TabsContent value="complexity" className="space-y-6">
           <div className="grid grid-cols-1 gap-6">
+
+            {/* Top Models by Complexity Level */}
+            {topModelsByComplexity.length > 0 && (
+              <Card className="border border-border bg-card">
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-primary" />
+                    Recommended Models by Complexity Level
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Top 3 models ranked by composite score (Accuracy 60%, Latency 30%, Cost 10%)
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {topModelsByComplexity.map((complexityLevel) => (
+                      <div key={complexityLevel.category} className="space-y-3">
+                        <div className="flex items-center gap-2 pb-2 border-b border-border">
+                          <Brain className="w-4 h-4 text-primary" />
+                          <h3 className="font-semibold text-sm text-foreground">
+                            {complexityLevel.category}
+                          </h3>
+                        </div>
+                        <div className="space-y-2">
+                          {complexityLevel.topModels.map((model, index) => (
+                            <div
+                              key={model.modelName}
+                              className={`rounded-lg p-3 ${index === 0
+                                ? 'border-2 border-primary/40 bg-primary/5'
+                                : 'border border-border bg-card'
+                                }`}
+                            >
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="flex items-center justify-center w-5 h-5 rounded-full bg-muted text-muted-foreground text-xs font-semibold">
+                                  {index + 1}
+                                </span>
+                                <span
+                                  className="w-2 h-2 rounded-full"
+                                  style={{ backgroundColor: model.color }}
+                                />
+                                <span className="text-xs font-medium text-foreground truncate">
+                                  {model.modelName}
+                                </span>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="flex justify-between items-center text-[10px]">
+                                  <span className="text-muted-foreground">Score:</span>
+                                  <span className={`font-semibold ${index === 0 ? 'text-primary' : 'text-foreground'}`}>
+                                    {model.compositeScore.toFixed(1)}%
+                                  </span>
+                                </div>
+                                <div className="grid grid-cols-3 gap-1 text-[10px] text-muted-foreground">
+                                  <div className="flex flex-col">
+                                    <span>Acc</span>
+                                    <span className="font-medium text-foreground">{model.accuracy.toFixed(0)}%</span>
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <span>Lat</span>
+                                    <span className="font-medium text-foreground">{model.latency.toFixed(0)}ms</span>
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <span>Cost</span>
+                                    <span className="font-medium text-foreground">${model.avgCost.toFixed(4)}</span>
+                                  </div>
+                                </div>
+                                <div className="text-[10px] mt-1 flex items-center gap-1">
+                                  <span className={model.hasLowConfidence ? 'text-yellow-500' : 'text-muted-foreground'}>
+                                    {model.requestCount} {model.requestCount === 1 ? 'query' : 'queries'}
+                                  </span>
+                                  {model.hasLowConfidence && (
+                                    <span className="text-yellow-500" title="Low confidence: fewer than 5 queries">⚠</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Accuracy by Complexity */}
             <Card className="border border-border bg-card">

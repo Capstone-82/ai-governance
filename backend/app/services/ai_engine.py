@@ -173,6 +173,9 @@ async def analyze_governance_batch(
     conv = db_service.create_conversation(title=query[:100])
     db_service.add_message(conv.id, "user", query)
     
+    # Per-model timeout: 90 seconds (allows slower models to complete)
+    MODEL_TIMEOUT = 90.0
+    
     tasks = []
     with ThreadPoolExecutor(max_workers=max(len(configs), 1) + 2) as executor:
         futures = [
@@ -189,16 +192,155 @@ async def analyze_governance_batch(
             for config in configs
         ]
         
+        # Wrap each future with a timeout
+        timeout_futures = [
+            asyncio.wait_for(future, timeout=MODEL_TIMEOUT)
+            for future in futures
+        ]
+        
         # Use return_exceptions=True to prevent one failure from killing the batch
-        raw_results = await asyncio.gather(*futures, return_exceptions=True)
+        raw_results = await asyncio.gather(*timeout_futures, return_exceptions=True)
         
         results = []
         for i, res in enumerate(raw_results):
-            if isinstance(res, Exception):
+            if isinstance(res, asyncio.TimeoutError):
+                print(f"Timeout for model {configs[i].model_id} after {MODEL_TIMEOUT}s")
+                # Create a failed log entry for timeout
+                timeout_log = GovernanceLog(
+                    id=str(uuid.uuid4()),
+                    trace_id=str(uuid.uuid4()),
+                    provider=ModelProvider.OTHER,
+                    model_id=configs[i].model_id,
+                    started_at=datetime.utcnow(),
+                    ended_at=datetime.utcnow(),
+                    usage=UsageMetrics(input_tokens=0, output_tokens=0, total_tokens=0, latency_ms=MODEL_TIMEOUT * 1000),
+                    cost=CostMetrics(input_cost=0, output_cost=0, total_cost=0),
+                    accuracy=AccuracyMetrics(score=0, rationale="Model timed out", evaluator_model=evaluator_model),
+                    status=InvocationStatus.FAILED,
+                    success=False,
+                    error_message=f"Model execution exceeded {MODEL_TIMEOUT}s timeout",
+                    tags={"environment": "dev", "governance_context": governance_context},
+                    input_prompt=query,
+                    response_text=""
+                )
+                results.append(timeout_log)
+            elif isinstance(res, Exception):
                 # This handles cases where analyze_governance itself crashed before its internal try-except
                 print(f"Batch Error for model {configs[i].model_id}: {res}")
-                # We could create a mock fail log here if needed
+                # Create a failed log entry
+                error_log = GovernanceLog(
+                    id=str(uuid.uuid4()),
+                    trace_id=str(uuid.uuid4()),
+                    provider=ModelProvider.OTHER,
+                    model_id=configs[i].model_id,
+                    started_at=datetime.utcnow(),
+                    ended_at=datetime.utcnow(),
+                    usage=UsageMetrics(input_tokens=0, output_tokens=0, total_tokens=0, latency_ms=0),
+                    cost=CostMetrics(input_cost=0, output_cost=0, total_cost=0),
+                    accuracy=AccuracyMetrics(score=0, rationale="Model execution failed", evaluator_model=evaluator_model),
+                    status=InvocationStatus.FAILED,
+                    success=False,
+                    error_message=str(res),
+                    tags={"environment": "dev", "governance_context": governance_context},
+                    input_prompt=query,
+                    response_text=""
+                )
+                results.append(error_log)
             else:
                 results.append(res)
         
     return results
+
+
+async def analyze_governance_stream(
+    query: str, 
+    configs: List[ModelConfig], 
+    evaluator_model: str = "gemini-2.5-pro",
+    governance_context: str = "aws"
+):
+    """
+    Stream results as each model completes (async generator for SSE).
+    Yields GovernanceLog objects as they become available.
+    """
+    loop = asyncio.get_running_loop()
+    
+    # 1. Create conversation first
+    conv = db_service.create_conversation(title=query[:100])
+    db_service.add_message(conv.id, "user", query)
+    
+    # Per-model timeout: 90 seconds
+    MODEL_TIMEOUT = 90.0
+    
+    with ThreadPoolExecutor(max_workers=max(len(configs), 1) + 2) as executor:
+        # Create all futures with timeout
+        tasks = []
+        config_map = {}
+        
+        for config in configs:
+            future = loop.run_in_executor(
+                executor, 
+                analyze_governance, 
+                query, 
+                config.host_platform, 
+                config.model_id,
+                conv.id,
+                evaluator_model,
+                governance_context
+            )
+            # Create a task with timeout
+            task = asyncio.create_task(asyncio.wait_for(future, timeout=MODEL_TIMEOUT))
+            tasks.append(task)
+            config_map[task] = config
+        
+        # Yield results as they complete
+        pending = set(tasks)
+        
+        while pending:
+            # Wait for the next task to complete
+            done, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+            
+            for task in done:
+                config = config_map[task]
+                try:
+                    result = await task
+                    yield result
+                except asyncio.TimeoutError:
+                    print(f"Timeout for model {config.model_id} after {MODEL_TIMEOUT}s")
+                    timeout_log = GovernanceLog(
+                        id=str(uuid.uuid4()),
+                        trace_id=str(uuid.uuid4()),
+                        provider=ModelProvider.OTHER,
+                        model_id=config.model_id,
+                        started_at=datetime.utcnow(),
+                        ended_at=datetime.utcnow(),
+                        usage=UsageMetrics(input_tokens=0, output_tokens=0, total_tokens=0, latency_ms=MODEL_TIMEOUT * 1000),
+                        cost=CostMetrics(input_cost=0, output_cost=0, total_cost=0),
+                        accuracy=AccuracyMetrics(score=0, rationale="Model timed out", evaluator_model=evaluator_model),
+                        status=InvocationStatus.FAILED,
+                        success=False,
+                        error_message=f"Model execution exceeded {MODEL_TIMEOUT}s timeout",
+                        tags={"environment": "dev", "governance_context": governance_context},
+                        input_prompt=query,
+                        response_text=""
+                    )
+                    yield timeout_log
+                except Exception as e:
+                    print(f"Stream Error for model {config.model_id}: {e}")
+                    error_log = GovernanceLog(
+                        id=str(uuid.uuid4()),
+                        trace_id=str(uuid.uuid4()),
+                        provider=ModelProvider.OTHER,
+                        model_id=config.model_id,
+                        started_at=datetime.utcnow(),
+                        ended_at=datetime.utcnow(),
+                        usage=UsageMetrics(input_tokens=0, output_tokens=0, total_tokens=0, latency_ms=0),
+                        cost=CostMetrics(input_cost=0, output_cost=0, total_cost=0),
+                        accuracy=AccuracyMetrics(score=0, rationale="Model execution failed", evaluator_model=evaluator_model),
+                        status=InvocationStatus.FAILED,
+                        success=False,
+                        error_message=str(e),
+                        tags={"environment": "dev", "governance_context": governance_context},
+                        input_prompt=query,
+                        response_text=""
+                    )
+                    yield error_log

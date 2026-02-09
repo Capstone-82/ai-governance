@@ -100,12 +100,6 @@ export interface AnalyticsData {
     percentage: number;
     color: string;
   }[];
-  efficiencyScores: {
-    modelId: string;
-    modelName: string;
-    score: number;
-    color: string;
-  }[];
   accuracyComparison: {
     modelId: string;
     modelName: string;

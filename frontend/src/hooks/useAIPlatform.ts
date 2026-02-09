@@ -114,7 +114,6 @@ export function useAIPlatform() {
       updatedAt: new Date(),
       messages: [],
       selectedModels: [
-        'anthropic.claude-sonnet-4-20250514-v1:0',
         'gemini-2.5-flash',
         'gpt-4o'
       ],
@@ -286,6 +285,183 @@ export function useAIPlatform() {
 
       toast({
         title: errorTitle,
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsExecuting(false);
+    }
+  }, [currentSession, governanceContext, toast]);
+
+  const executePromptStreaming = useCallback(async (
+    prompt: string,
+    config: ExecutionConfig,
+    session?: Session,
+    onProgress?: (completed: number, total: number) => void
+  ) => {
+    const targetSession = session || currentSession;
+    if (!targetSession) return;
+
+    setIsExecuting(true);
+
+    const userMessage: Message = {
+      id: generateId(),
+      role: 'user',
+      content: prompt,
+      timestamp: new Date(),
+    };
+
+    try {
+      const backendModels: BackendModelConfig[] = config.selectedModels.map(modelId => {
+        const model = getModelById(modelId);
+        return {
+          host_platform: model?.hostPlatform || 'aws_bedrock',
+          model_id: modelId,
+        };
+      });
+
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+      const response = await fetch(`${API_BASE_URL}/api/v1/governance/analyze/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(config.guardrailId ? { 'x-aws-guardrail-id': config.guardrailId } : {}),
+        },
+        body: JSON.stringify({
+          query: prompt,
+          governance_context: governanceContext,
+          models: backendModels,
+          evaluator_model: config.evaluatorModel,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `Stream failed: ${response.statusText}`;
+        try {
+          const json = JSON.parse(errorText);
+          if (json.detail) {
+            errorMessage = json.detail;
+          }
+        } catch (e) {
+          // ignore parsing error
+        }
+        throw new Error(errorMessage);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('Stream reader not available');
+      }
+
+      const modelRuns: ModelRun[] = [];
+      let total = config.selectedModels.length;
+      let completed = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6));
+
+            if (data.type === 'start') {
+              total = data.total;
+              onProgress?.(0, total);
+            } else if (data.type === 'result') {
+              const log: GovernanceLog = data.data;
+              const model = getModelById(log.model_id);
+
+              const modelRun: ModelRun = {
+                id: log.id,
+                modelId: log.model_id,
+                response: log.response_text,
+                inputTokens: log.usage.input_tokens,
+                outputTokens: log.usage.output_tokens,
+                latencyMs: log.usage.latency_ms,
+                cost: log.cost.total_cost,
+                contextUsage: model
+                  ? ((log.usage.input_tokens + log.usage.output_tokens) / model.contextWindow) * 100
+                  : 0,
+                timestamp: new Date(log.ended_at),
+                status: log.success ? 'completed' : 'failed',
+                error: log.error_message,
+                accuracy: log.accuracy.score,
+                accuracyRationale: log.accuracy.rationale,
+                queryCategory: log.accuracy.query_category,
+                promptOptimization: log.accuracy.prompt_optimization,
+              };
+
+              modelRuns.push(modelRun);
+              completed++;
+              onProgress?.(completed, total);
+
+              // Update session progressively
+              const assistantMessage: Message = {
+                id: generateId(),
+                role: 'assistant',
+                content: 'Multi-model response',
+                timestamp: new Date(),
+                modelRuns: [...modelRuns],
+              };
+
+              const updatedSession: Session = {
+                ...targetSession,
+                title: targetSession.messages.length === 0
+                  ? (prompt.slice(0, 40) + (prompt.length > 40 ? '...' : ''))
+                  : targetSession.title,
+                updatedAt: new Date(),
+                messages: [...targetSession.messages.filter(m => m.role !== 'assistant' || m.id !== assistantMessage.id), userMessage, assistantMessage],
+                totalTokens: targetSession.totalTokens + modelRuns.reduce((sum, run) => sum + run.inputTokens + run.outputTokens, 0),
+                totalCost: targetSession.totalCost + modelRuns.reduce((sum, run) => sum + run.cost, 0),
+                isTokenOptimized: config.useHistory && targetSession.messages.length > 0,
+              };
+
+              setCurrentSession(updatedSession);
+              setSessions(prev => {
+                const index = prev.findIndex(s => s.id === updatedSession.id);
+                if (index >= 0) {
+                  return prev.map(s => s.id === updatedSession.id ? updatedSession : s);
+                } else {
+                  return [updatedSession, ...prev];
+                }
+              });
+
+              // Update analytics progressively
+              setAnalytics(generateAnalytics(modelRuns));
+              setRecommendations(generateRecommendations(modelRuns));
+              setConfidence(generateConfidence(modelRuns));
+              setDivergence(generateDivergence(modelRuns));
+              setPromptSuggestions(analyzePrompt(prompt));
+            } else if (data.type === 'complete') {
+              toast({
+                title: "Analysis Complete",
+                description: `Received responses from ${modelRuns.length} models`,
+              });
+            } else if (data.type === 'error') {
+              throw new Error(data.message);
+            }
+          }
+        }
+      }
+
+    } catch (error) {
+      console.error('Streaming error:', error);
+
+      let errorMessage = "Failed to execute prompt";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      toast({
+        title: "Error",
         description: errorMessage,
         variant: "destructive",
       });
@@ -499,6 +675,7 @@ export function useAIPlatform() {
     renameSession,
     setCurrentSession,
     executePrompt,
+    executePromptStreaming,
     estimateCost,
     models: AI_MODELS,
   };

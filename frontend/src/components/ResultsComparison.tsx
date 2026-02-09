@@ -51,14 +51,14 @@ export function ModelResultCard({ run, index, isRecommended, recommendationType 
       )}>
         <CardHeader className="p-4 space-y-0 pb-3">
           <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
               <div
-                className="w-2.5 h-2.5 rounded-full ring-4 ring-current/10"
+                className="w-2.5 h-2.5 rounded-full ring-4 ring-current/10 flex-shrink-0"
                 style={{ backgroundColor: model.color, color: model.color }}
               />
-              <div>
-                <h3 className="font-semibold text-sm leading-none mb-1">{model.name}</h3>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{model.provider}</p>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-semibold text-sm leading-none mb-1 truncate">{model.name}</h3>
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium truncate">{model.provider}</p>
               </div>
             </div>
             <button
@@ -113,7 +113,7 @@ export function ModelResultCard({ run, index, isRecommended, recommendationType 
                 className="overflow-hidden"
               >
                 <div className="px-4 pb-4 pt-1">
-                  <div className="bg-muted/30 rounded-lg p-3 text-sm leading-relaxed text-foreground/90 font-normal max-h-[500px] overflow-y-auto break-words overflow-wrap-anywhere">
+                  <div className="bg-muted/30 rounded-lg p-3 text-sm leading-relaxed text-foreground/90 font-normal max-h-[500px] w-full overflow-y-auto overflow-x-hidden">
                     <MarkdownRenderer content={run.response} />
                   </div>
                 </div>
@@ -153,13 +153,14 @@ export function ResultsComparison({ runs, recommendedModelId, recommendationType
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         {runs.map((run, index) => (
-          <ModelResultCard
-            key={run.id}
-            run={run}
-            index={index}
-            isRecommended={run.modelId === recommendedModelId}
-            recommendationType={run.modelId === recommendedModelId ? recommendationType : undefined}
-          />
+          <div key={run.id} className="min-w-0">
+            <ModelResultCard
+              run={run}
+              index={index}
+              isRecommended={run.modelId === recommendedModelId}
+              recommendationType={run.modelId === recommendedModelId ? recommendationType : undefined}
+            />
+          </div>
         ))}
       </div>
     </div>

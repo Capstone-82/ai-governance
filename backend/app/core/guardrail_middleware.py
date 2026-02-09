@@ -6,7 +6,7 @@ from starlette.responses import JSONResponse
 from app.core.config import settings
 
 class BedrockGuardrailMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, guardrail_id: str, guardrail_version: str = "DRAFT", region_name: str = "us-east-1"):
+    def __init__(self, app, guardrail_id: str = None, guardrail_version: str = "DRAFT", region_name: str = "us-east-1"):
         super().__init__(app)
         self.guardrail_id = guardrail_id
         self.guardrail_version = guardrail_version
@@ -21,16 +21,26 @@ class BedrockGuardrailMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next):
         # Only check analysis endpoints (POST)
-        if request.method == "POST" and request.url.path in ["/api/v1/governance/analyze", "/api/v1/governance/analyze/batch"]:
+        if request.method == "POST" and request.url.path.startswith("/api/v1/governance/analyze"):
+            print(f"Guardrail Middleware: Intercepted path {request.url.path}")
             # Check if a specific guardrail ID is requested via header
             requested_guardrail_id = request.headers.get("x-aws-guardrail-id")
             
-            # STRICT MODE: Only run if header is present
-            if not requested_guardrail_id:
-                # print("Guardrail Middleware: No header found. Skipping.")
-                return await call_next(request)
+
 
             active_guardrail_id = requested_guardrail_id
+            
+            # Print for debugging
+            # print(f"Guardrail Middleware: Active ID {active_guardrail_id}")
+
+            if not active_guardrail_id:
+                # If no header, fallback to environment default if available
+                if self.guardrail_id:
+                     active_guardrail_id = self.guardrail_id
+                else:
+                     # print("Guardrail Middleware: No ID found. Skipping.")
+                     return await call_next(request)
+
             print(f"Guardrail Middleware: Checking ID {active_guardrail_id}...")
 
             try:

@@ -52,17 +52,6 @@ export const generateAnalytics = (runs: ModelRun[]): AnalyticsData => {
                 color: model?.color || '#888',
             };
         }),
-        efficiencyScores: runs.map(run => {
-            const model = getModelById(run.modelId);
-            // Efficiency = quality per cost-latency unit (higher is better)
-            const score = Math.round((run.outputTokens / run.inputTokens) * (1000 / run.latencyMs) * (0.01 / run.cost) * 100);
-            return {
-                modelId: run.modelId,
-                modelName: model?.name || run.modelId,
-                score: Math.min(100, Math.max(0, score)),
-                color: model?.color || '#888',
-            };
-        }),
         accuracyComparison: runs.map(run => {
             const model = getModelById(run.modelId);
             return {

@@ -243,7 +243,7 @@ export const AI_MODELS: AIModel[] = [
     color: '#FF9900',
   },
   {
-    id: 'meta.llama4-maverick-17b-instruct-v1:0',
+    id: 'us.meta.llama4-maverick-17b-instruct-v1:0',
     name: 'Llama 4 Maverick 17B',
     provider: 'amazon',
     hostPlatform: 'aws_bedrock',
@@ -256,7 +256,7 @@ export const AI_MODELS: AIModel[] = [
     color: '#FF9900',
   },
   {
-    id: 'meta.llama4-scout-17b-instruct-v1:0',
+    id: 'us.meta.llama4-scout-17b-instruct-v1:0',
     name: 'Llama 4 Scout 17B',
     provider: 'amazon',
     hostPlatform: 'aws_bedrock',
@@ -269,7 +269,7 @@ export const AI_MODELS: AIModel[] = [
     color: '#FFB84D',
   },
   {
-    id: 'meta.llama3-3-70b-instruct-v1:0',
+    id: 'us.meta.llama3-3-70b-instruct-v1:0',
     name: 'Llama 3.3 Instruct 70B',
     provider: 'amazon',
     hostPlatform: 'aws_bedrock',
@@ -282,7 +282,7 @@ export const AI_MODELS: AIModel[] = [
     color: '#FF9900',
   },
   {
-    id: 'meta.llama3-2-1b-instruct-v1:0',
+    id: 'us.meta.llama3-2-1b-instruct-v1:0',
     name: 'Llama 3.2 Instruct 1B',
     provider: 'amazon',
     hostPlatform: 'aws_bedrock',
@@ -295,7 +295,7 @@ export const AI_MODELS: AIModel[] = [
     color: '#FFCC80',
   },
   {
-    id: 'meta.llama3-2-3b-instruct-v1:0',
+    id: 'us.meta.llama3-2-3b-instruct-v1:0',
     name: 'Llama 3.2 Instruct 3B',
     provider: 'amazon',
     hostPlatform: 'aws_bedrock',
@@ -308,7 +308,7 @@ export const AI_MODELS: AIModel[] = [
     color: '#FFCC80',
   },
   {
-    id: 'meta.llama3-2-11b-instruct-v1:0',
+    id: 'us.meta.llama3-2-11b-instruct-v1:0',
     name: 'Llama 3.2 Instruct 11B',
     provider: 'amazon',
     hostPlatform: 'aws_bedrock',
@@ -321,7 +321,7 @@ export const AI_MODELS: AIModel[] = [
     color: '#FFB84D',
   },
   {
-    id: 'meta.llama3-2-90b-instruct-v1:0',
+    id: 'us.meta.llama3-2-90b-instruct-v1:0',
     name: 'Llama 3.2 Instruct 90B',
     provider: 'amazon',
     hostPlatform: 'aws_bedrock',

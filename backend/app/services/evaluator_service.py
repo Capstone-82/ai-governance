@@ -2,6 +2,7 @@ from google import genai
 from typing import Optional, Dict
 from app.core.config import settings
 from app.services.llm_providers.openai_provider import OpenAIProvider
+from app.services.llm_providers.bedrock import BedrockService
 
 class EvaluatorService:
     def __init__(self):
@@ -14,6 +15,9 @@ class EvaluatorService:
 
         # Initialize OpenAI Provider
         self.openai_provider = OpenAIProvider()
+        
+        # Initialize Bedrock Provider
+        self.bedrock_service = BedrockService()
 
     def evaluate_response(self, original_query: str, ai_response: str, model_id: str = "gemini-2.5-pro") -> Dict[str, any]:
         """
@@ -59,6 +63,11 @@ class EvaluatorService:
                 openai_res = self.openai_provider.invoke_model(model_id, prompt)
                 result_text = openai_res["response_text"]
                 
+            elif "llama" in model_id.lower() or "bedrock" in model_id.lower():
+                # Bedrock Route
+                bedrock_res = self.bedrock_service.invoke_model(model_id, prompt)
+                result_text = bedrock_res["response_text"]
+
             else:
                 # Default: Google Route (Gemini)
                 if not self.client:

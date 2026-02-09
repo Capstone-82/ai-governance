@@ -58,12 +58,12 @@ const Index = () => {
     renameSession,
     setCurrentSession,
     executePrompt,
+    executePromptStreaming,
     estimateCost,
     models,
   } = useAIPlatform();
 
   const [selectedModels, setSelectedModels] = useState<string[]>([
-    'anthropic.claude-3-5-sonnet-20240620-v1:0',
     'gemini-2.5-flash',
     'gpt-4o',
   ]);
@@ -71,13 +71,14 @@ const Index = () => {
   const [selectedGuardrail, setSelectedGuardrail] = useState<string>(GUARDRAILS[0].id);
   const [selectedEvaluator, setSelectedEvaluator] = useState<string>('gemini-2.5-pro');
   const [isLoadingConversation, setIsLoadingConversation] = useState(false);
+  const [progress, setProgress] = useState<{ completed: number; total: number } | null>(null);
 
   const EVALUATOR_MODELS = [
     { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro (Default)' },
     { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro Preview' },
-    { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview' },
+    { id: 'us.meta.llama4-maverick-17b-instruct-v1:0', name: 'Llama 4 Maverick 17B' },
+    { id: 'us.meta.llama3-3-70b-instruct-v1:0', name: 'Llama 3.3 70B' },
     { id: 'gpt-5.2', name: 'GPT-5.2' },
-    { id: 'gpt-5-2025-08-07', name: 'GPT-5 (Aug 2025)' },
   ];
   const [loadedMessages, setLoadedMessages] = useState<Message[]>([]);
   const [conversationTitle, setConversationTitle] = useState<string>('');
@@ -225,13 +226,20 @@ const Index = () => {
     // Use current session or create a new one synchronously
     const session = currentSession || createSession();
 
-    executePrompt(prompt, {
+    // Use streaming for better UX with many models
+    executePromptStreaming(prompt, {
       mode,
       selectedModels,
       useHistory: session.messages.length > 0,
       guardrailId: guardrailsEnabled ? selectedGuardrail : undefined,
       evaluatorModel: selectedEvaluator,
-    }, session);  // Pass session explicitly
+    }, session, (completed, total) => {
+      setProgress({ completed, total });
+      if (completed === total) {
+        // Clear progress after a brief delay
+        setTimeout(() => setProgress(null), 2000);
+      }
+    });
   };
 
   const handleNewSession = () => {
@@ -412,6 +420,33 @@ const Index = () => {
                   estimatedCost={estimatedCost}
                   isNewSession={currentSession.messages.length === 0}
                 />
+
+                {/* Progress Indicator */}
+                {progress && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="rounded-lg border border-primary/20 bg-primary/5 p-4"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-foreground">
+                        Processing models...
+                      </span>
+                      <span className="text-sm font-semibold text-primary">
+                        {progress.completed} / {progress.total}
+                      </span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                      <motion.div
+                        className="h-full bg-primary"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${(progress.completed / progress.total) * 100}%` }}
+                        transition={{ duration: 0.3 }}
+                      />
+                    </div>
+                  </motion.div>
+                )}
 
                 {/* Results & Analytics */}
                 {latestRuns.length > 0 && (
