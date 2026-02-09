@@ -1,0 +1,17 @@
+.git
+.gitignore
+__pycache__
+*.pyc
+venv/
+env/
+.env
+tests/
+misc/
+test_*.py
+list_*.py
+add_columns.py
+check_db.py
+
+README.md
+API_DOCUMENTATION.md
+BACKEND_SUMMARY.md

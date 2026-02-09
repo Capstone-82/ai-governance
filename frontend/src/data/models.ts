@@ -12,6 +12,8 @@ export const AI_MODELS: AIModel[] = [
     avgLatency: 2500,
     capabilities: ['reasoning', 'code', 'analysis', 'creative'],
     color: '#D97706',
+    backendId: 'anthropic.claude-3-5-sonnet-20240620-v1:0',
+    backendPlatform: 'aws_bedrock',
   },
   {
     id: 'claude-3-haiku',
@@ -24,10 +26,12 @@ export const AI_MODELS: AIModel[] = [
     avgLatency: 800,
     capabilities: ['speed', 'simple-tasks', 'classification'],
     color: '#F59E0B',
+    backendId: 'anthropic.claude-3-haiku-20240307-v1:0',
+    backendPlatform: 'aws_bedrock',
   },
   {
     id: 'gemini-2-flash',
-    name: 'Gemini 2.0 Flash',
+    name: 'Gemini 2.5 Flash',
     provider: 'google',
     description: 'Fast and efficient multimodal model',
     contextWindow: 1000000,
@@ -36,10 +40,12 @@ export const AI_MODELS: AIModel[] = [
     avgLatency: 600,
     capabilities: ['multimodal', 'speed', 'long-context'],
     color: '#4285F4',
+    backendId: 'gemini-2.5-flash',
+    backendPlatform: 'gcp_vertex',
   },
   {
     id: 'gemini-2-pro',
-    name: 'Gemini 2.0 Pro',
+    name: 'Gemini 2.5 Pro',
     provider: 'google',
     description: 'Best for complex reasoning and coding',
     contextWindow: 2000000,
@@ -48,6 +54,8 @@ export const AI_MODELS: AIModel[] = [
     avgLatency: 2000,
     capabilities: ['reasoning', 'code', 'long-context', 'multimodal'],
     color: '#34A853',
+    backendId: 'gemini-2.5-pro',
+    backendPlatform: 'gcp_vertex',
   },
   {
     id: 'gpt-4o',
@@ -60,6 +68,8 @@ export const AI_MODELS: AIModel[] = [
     avgLatency: 1800,
     capabilities: ['reasoning', 'code', 'creative', 'vision'],
     color: '#10B981',
+    backendId: 'gpt-4o',
+    backendPlatform: 'openai',
   },
   {
     id: 'gpt-4o-mini',
@@ -72,10 +82,12 @@ export const AI_MODELS: AIModel[] = [
     avgLatency: 700,
     capabilities: ['speed', 'cost-effective', 'simple-tasks'],
     color: '#059669',
+    backendId: 'gpt-4o-mini',
+    backendPlatform: 'openai',
   },
   {
     id: 'claude-bedrock',
-    name: 'Claude (Bedrock)',
+    name: 'Claude 3 Sonnet (Bedrock)',
     provider: 'amazon',
     description: 'Claude via AWS Bedrock integration',
     contextWindow: 200000,
@@ -84,6 +96,8 @@ export const AI_MODELS: AIModel[] = [
     avgLatency: 2800,
     capabilities: ['aws-native', 'reasoning', 'enterprise'],
     color: '#FF9900',
+    backendId: 'anthropic.claude-3-sonnet-20240229-v1:0',
+    backendPlatform: 'aws_bedrock',
   },
 ];
 

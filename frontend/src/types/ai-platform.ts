@@ -11,6 +11,8 @@ export interface AIModel {
   avgLatency: number;
   capabilities: string[];
   color: string;
+  backendId: string;
+  backendPlatform: string;
 }
 
 export interface ModelRun {

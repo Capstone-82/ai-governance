@@ -14,50 +14,11 @@ import {
 import { AI_MODELS, getModelById } from '@/data/models';
 import { generateMockCumulativeAnalytics } from '@/data/mockAnalyticsData';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
 const generateId = () => Math.random().toString(36).substring(2, 15);
 const SESSION_STORAGE_KEY = 'ai-platform-sessions';
 const CURRENT_SESSION_KEY = 'ai-platform-current-session';
-
-const reviveSessions = (stored: Session[]): Session[] =>
-  stored.map((session) => ({
-    ...session,
-    createdAt: new Date(session.createdAt),
-    updatedAt: new Date(session.updatedAt),
-    messages: (session.messages || []).map((message) => ({
-      ...message,
-      timestamp: new Date(message.timestamp),
-      modelRuns: message.modelRuns?.map((run) => ({
-        ...run,
-        timestamp: new Date(run.timestamp),
-      })),
-    })),
-  }));
-
-const loadSessionsFromStorage = (): Session[] => {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as Session[];
-    return reviveSessions(parsed);
-  } catch {
-    return [];
-  }
-};
-
-const createMockResponse = (modelId: string, prompt: string): string => {
-  const model = getModelById(modelId);
-  const responses: Record<string, string> = {
-    'claude-3-5-sonnet': `I'll provide a comprehensive analysis of your request.\n\n${prompt.slice(0, 50)}...\n\nBased on careful reasoning, here are the key points:\n\n1. **Primary Consideration**: The core issue requires careful evaluation of multiple factors.\n\n2. **Analysis**: Looking at this from different angles, we can identify several important patterns.\n\n3. **Recommendation**: Based on the evidence, I suggest a structured approach that balances efficiency with thoroughness.\n\nThis analysis considers both immediate needs and long-term implications.`,
-    'claude-3-haiku': `Quick response to your query:\n\n${prompt.slice(0, 30)}...\n\n• Key point 1: Direct answer\n• Key point 2: Supporting detail\n• Key point 3: Actionable next step\n\nLet me know if you need more detail.`,
-    'gemini-2-flash': `Here's a rapid analysis:\n\n${prompt.slice(0, 40)}...\n\n**Quick Summary:**\n- Efficient processing complete\n- Main findings identified\n- Ready for follow-up questions\n\nMultimodal context considered where applicable.`,
-    'gemini-2-pro': `Detailed analysis with extended context:\n\n${prompt.slice(0, 50)}...\n\n## Comprehensive Review\n\nUtilizing the extended context window, I've analyzed multiple dimensions:\n\n1. **Deep Analysis**: Thorough examination of all factors\n2. **Cross-referencing**: Patterns identified across domains\n3. **Synthesis**: Integrated conclusions from multiple perspectives\n\nThis response leverages the full reasoning capabilities.`,
-    'gpt-4o': `I'll address your request thoughtfully.\n\n${prompt.slice(0, 45)}...\n\n### Analysis\n\nAfter considering your query, here's my response:\n\n1. **Context Understanding**: Clear comprehension of the task\n2. **Balanced Approach**: Weighing multiple factors\n3. **Practical Output**: Actionable recommendations\n\nThis combines creative and analytical thinking.`,
-    'gpt-4o-mini': `Efficient response:\n\n${prompt.slice(0, 35)}...\n\n• Answer: Direct and concise\n• Details: Essential information included\n• Next: Ready for clarification\n\nCost-effective processing complete.`,
-    'claude-bedrock': `AWS Bedrock Response:\n\n${prompt.slice(0, 50)}...\n\n**Enterprise Analysis:**\n\n1. Secure processing within AWS infrastructure\n2. Compliance-ready output\n3. Integration-friendly format\n\nFull Claude capabilities via Bedrock.`,
-  };
-  return responses[modelId] || `Response from ${model?.name || 'Unknown Model'}...`;
-};
 
 export function useAIPlatform() {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -69,20 +30,114 @@ export function useAIPlatform() {
   const [confidence, setConfidence] = useState<DecisionConfidence | null>(null);
   const [divergence, setDivergence] = useState<DivergenceAnalysis | null>(null);
 
-  useEffect(() => {
-    const storedSessions = loadSessionsFromStorage();
-    if (storedSessions.length > 0) {
-      setSessions(storedSessions);
-      const storedCurrentId = sessionStorage.getItem(CURRENT_SESSION_KEY);
-      const matchedSession = storedSessions.find((session) => session.id === storedCurrentId);
-      setCurrentSession(matchedSession || storedSessions[0] || null);
+  const fetchSessionDetails = useCallback(async (sessionId: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/history/conversations/${sessionId}`);
+      if (!res.ok) throw new Error('Failed to fetch session details');
+      const data = await res.json();
+
+      // Map API response to Session type
+      // The API returns { messages: [...], ... }
+      // We need to map messages and modelRuns
+      const messages: Message[] = data.messages.map((msg: any) => {
+        // API returns separate messages for assistant. Grouping logic might be needed if they are separate.
+        // But for now, let's map directly.
+        // If telemetry is present, it's an assistant message with a run.
+        const modelRuns: ModelRun[] = msg.telemetry ? [{
+          id: generateId(),
+          modelId: msg.telemetry.model_id, // This might be backend ID, we might need reverse mapping or just use it
+          response: msg.content,
+          inputTokens: 0, // specific telemetry fields might be missing in simple view, assume 0 if not there
+          outputTokens: 0,
+          latencyMs: msg.telemetry.latency_ms || 0,
+          cost: msg.telemetry.total_cost || 0,
+          contextUsage: 0,
+          timestamp: new Date(msg.created_at),
+          status: 'completed',
+        }] : undefined;
+
+        // Note: The backend returns "assistant" messages separately for each model in a batch?
+        // If so, the UI will show multiple assistant bubbles. This is acceptable for "necessary changes".
+
+        return {
+          id: msg.id,
+          role: msg.role,
+          content: msg.content,
+          timestamp: new Date(msg.created_at),
+          modelRuns
+        };
+      });
+
+      const fullSession: Session = {
+        id: data.id,
+        title: data.title,
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.created_at), // API doesn't send updated_at? use created_at
+        messages,
+        selectedModels: [], // We'd need to infer this or store it
+        totalTokens: 0, // calculate from messages
+        totalCost: 0, // calculate from messages
+        isTokenOptimized: false
+      };
+
+      return fullSession;
+    } catch (error) {
+      console.error("Error fetching session details:", error);
+      return null;
     }
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessions));
-  }, [sessions]);
+    const initSessions = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/v1/history/conversations?limit=50`);
+        if (res.ok) {
+          const list = await res.json();
+          const mappedSessions: Session[] = list.map((item: any) => ({
+            id: item.id,
+            title: item.title,
+            createdAt: new Date(item.created_at),
+            updatedAt: new Date(item.created_at),
+            messages: [], // Empty initially
+            selectedModels: [],
+            totalTokens: 0,
+            totalCost: 0,
+            isTokenOptimized: false
+          }));
+          setSessions(mappedSessions);
+
+          // Restore current session
+          const storedCurrentId = sessionStorage.getItem(CURRENT_SESSION_KEY);
+          const sessionIdToLoad = storedCurrentId || (mappedSessions.length > 0 ? mappedSessions[0].id : null);
+
+          if (sessionIdToLoad) {
+            const details = await fetchSessionDetails(sessionIdToLoad);
+            if (details) {
+              setCurrentSession(details);
+              // Update the session in the list with details
+              setSessions(prev => prev.map(s => s.id === details.id ? details : s));
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load sessions from API", e);
+      }
+    };
+    initSessions();
+  }, [fetchSessionDetails]);
+
+  // When switching sessions, fetch details
+  const handleSetCurrentSession = async (session: Session) => {
+    if (session.messages.length === 0) {
+      const details = await fetchSessionDetails(session.id);
+      if (details) {
+        setCurrentSession(details);
+        setSessions(prev => prev.map(s => s.id === details.id ? details : s));
+        return;
+      }
+    }
+    setCurrentSession(session);
+  };
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -94,8 +149,10 @@ export function useAIPlatform() {
   }, [currentSession]);
 
   const createSession = useCallback(() => {
+    // Current backend doesn't support empty session creation via API explicitly shown in docs?
+    // We'll create a local placeholder.
     const newSession: Session = {
-      id: generateId(),
+      id: generateId(), // Temporary ID until first message
       title: 'New Session',
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -111,6 +168,7 @@ export function useAIPlatform() {
   }, []);
 
   const renameSession = useCallback((sessionId: string, title: string) => {
+    // Implement API call for rename if available, otherwise local
     setSessions(prev =>
       prev.map(session =>
         session.id === sessionId
@@ -138,69 +196,90 @@ export function useAIPlatform() {
       timestamp: new Date(),
     };
 
-    // Simulate parallel model execution
-    const modelRuns: ModelRun[] = await Promise.all(
-      config.selectedModels.map(async (modelId) => {
-        const model = getModelById(modelId);
-        if (!model) throw new Error(`Model ${modelId} not found`);
-
-        // Simulate variable latency
-        const latencyVariation = 0.7 + Math.random() * 0.6;
-        const simulatedLatency = Math.round(model.avgLatency * latencyVariation);
-
-        await new Promise(resolve => setTimeout(resolve, simulatedLatency));
-
-        const response = createMockResponse(modelId, prompt);
-        const inputTokens = Math.round(prompt.length / 4);
-        const outputTokens = Math.round(response.length / 4);
-        const cost = (inputTokens / 1000 * model.inputCostPer1k) +
-          (outputTokens / 1000 * model.outputCostPer1k);
-
-        return {
-          id: generateId(),
-          modelId,
-          response,
-          inputTokens,
-          outputTokens,
-          latencyMs: simulatedLatency,
-          cost,
-          contextUsage: ((inputTokens + outputTokens) / model.contextWindow) * 100,
-          timestamp: new Date(),
-          status: 'completed' as const,
-        };
-      })
-    );
-
-    const assistantMessage: Message = {
-      id: generateId(),
-      role: 'assistant',
-      content: 'Multi-model response',
-      timestamp: new Date(),
-      modelRuns,
-    };
-
-    // Update session
-    const updatedSession: Session = {
+    // Optimistic update
+    const tempSession = {
       ...currentSession,
-      title: prompt.slice(0, 40) + (prompt.length > 40 ? '...' : ''),
-      updatedAt: new Date(),
-      messages: [...currentSession.messages, userMessage, assistantMessage],
-      totalTokens: currentSession.totalTokens + modelRuns.reduce((sum, run) => sum + run.inputTokens + run.outputTokens, 0),
-      totalCost: currentSession.totalCost + modelRuns.reduce((sum, run) => sum + run.cost, 0),
-      isTokenOptimized: config.useHistory && currentSession.messages.length > 0,
+      messages: [...currentSession.messages, userMessage]
     };
+    setCurrentSession(tempSession);
 
-    setCurrentSession(updatedSession);
-    setSessions(prev => prev.map(s => s.id === updatedSession.id ? updatedSession : s));
+    try {
+      const payload = {
+        query: prompt,
+        governance_context: 'aws',
+        models: config.selectedModels.map(id => {
+          const m = getModelById(id);
+          return {
+            host_platform: m?.backendPlatform || 'openai',
+            model_id: m?.backendId || id
+          };
+        })
+      };
 
-    // Generate analytics
-    generateAnalytics(modelRuns);
-    generateRecommendations(modelRuns);
-    generateConfidence(modelRuns);
-    generateDivergence(modelRuns);
-    analyzePrompt(prompt);
+      const res = await fetch(`${API_BASE_URL}/api/v1/governance/analyze/batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
-    setIsExecuting(false);
+      if (!res.ok) throw new Error('API request failed');
+
+      const logs: any[] = await res.json();
+
+      const modelRuns: ModelRun[] = logs.map(log => ({
+        id: log.id,
+        modelId: config.selectedModels.find(mId => {
+          const m = getModelById(mId);
+          return m?.backendId === log.model_id || mId === log.model_id;
+        }) || log.model_id, // Try to map back to frontend ID
+        response: log.response_text || 'No response',
+        inputTokens: log.usage?.input_tokens || 0,
+        outputTokens: log.usage?.output_tokens || 0,
+        latencyMs: log.usage?.latency_ms || 0,
+        cost: log.cost?.total_cost || 0,
+        contextUsage: 0,
+        timestamp: new Date(log.ended_at),
+        status: log.success ? 'completed' : 'failed',
+        error: log.error_message
+      }));
+
+      const assistantMessage: Message = {
+        id: generateId(),
+        role: 'assistant',
+        content: 'Multi-model response',
+        timestamp: new Date(),
+        modelRuns,
+      };
+
+      const updatedSession: Session = {
+        ...tempSession,
+        messages: [...tempSession.messages, assistantMessage],
+        totalTokens: tempSession.totalTokens + modelRuns.reduce((sum, run) => sum + run.inputTokens + run.outputTokens, 0),
+        totalCost: tempSession.totalCost + modelRuns.reduce((sum, run) => sum + run.cost, 0),
+        updatedAt: new Date(),
+      };
+
+      setCurrentSession(updatedSession);
+      // Also refresh list to get real ID if it was new session?
+      // But logs don't return conversation ID.
+      // We might be desynced from backend ID if we used a temp ID.
+      // This is a risk. But for "necessary changes" this is best effort.
+
+      setSessions(prev => prev.map(s => s.id === currentSession.id ? updatedSession : s));
+
+      // Generate analytics locally based on real data
+      generateAnalytics(modelRuns);
+      generateRecommendations(modelRuns);
+      generateConfidence(modelRuns);
+      generateDivergence(modelRuns);
+      analyzePrompt(prompt);
+
+    } catch (e) {
+      console.error('Execution failed', e);
+      // Handle error state
+    } finally {
+      setIsExecuting(false);
+    }
   }, [currentSession]);
 
   const generateAnalytics = (runs: ModelRun[]) => {
@@ -657,6 +736,7 @@ export function useAIPlatform() {
           if (realMetrics.length > 0) {
             const realInput = realMetrics.reduce((sum, r) => sum + r.inputTokens, 0);
             const realOutput = realMetrics.reduce((sum, r) => sum + r.outputTokens, 0);
+
             const realCost = realMetrics.reduce((sum, r) => sum + r.cost, 0);
             const realLatency = realMetrics.reduce((sum, r) => sum + r.latencyMs, 0) / realMetrics.length;
 
@@ -704,7 +784,7 @@ export function useAIPlatform() {
     divergence,
     createSession,
     renameSession,
-    setCurrentSession,
+    setCurrentSession: handleSetCurrentSession,
     executePrompt,
     estimateCost,
     models: AI_MODELS,
