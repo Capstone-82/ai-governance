@@ -40,6 +40,8 @@ class AccuracyMetrics(BaseModel):
     score: float = Field(default=0.0, description="Accuracy score (0.0 to 1.0)")
     rationale: Optional[str] = Field(None, description="Explanation for the score")
     evaluator_model: Optional[str] = Field(None, description="Model used to evaluate accuracy")
+    query_category: Optional[str] = Field(None, description="Category of the query (e.g., Reasoning, Forecasting)")
+    prompt_optimization: Optional[str] = Field(None, description="Suggestions to optimize the prompt")
 
 class GovernanceLog(BaseModel):
     """

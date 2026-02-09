@@ -240,4 +240,18 @@
   .stagger-2 { animation-delay: 0.1s; }
   .stagger-3 { animation-delay: 0.15s; }
   .stagger-4 { animation-delay: 0.2s; }
+
+  /* Text overflow utilities */
+  .break-word {
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  .overflow-wrap-anywhere {
+    overflow-wrap: anywhere;
+  }
+
+  .hyphens-auto {
+    hyphens: auto;
+  }
 }

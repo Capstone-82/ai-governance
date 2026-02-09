@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Session } from '@/types/ai-platform';
 import {
@@ -10,9 +10,9 @@ import {
   BarChart3,
   PanelLeftClose,
   ChevronRight,
-  MoreHorizontal,
   Moon,
-  Sun
+  Sun,
+  Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -20,12 +20,9 @@ import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useTheme } from 'next-themes';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { toast } from '@/components/ui/sonner';
+import { useConversationHistory } from '@/hooks/useConversationHistory';
+import { ConversationSummary } from '@/services/api';
 
 interface SessionSidebarProps {
   sessions: Session[];
@@ -33,6 +30,7 @@ interface SessionSidebarProps {
   onSelectSession: (session: Session) => void;
   onNewSession: () => void;
   onRenameSession?: (sessionId: string, title: string) => void;
+  showBackendHistory?: boolean; // Toggle between local and backend history
 }
 
 export function SessionSidebar({
@@ -41,6 +39,7 @@ export function SessionSidebar({
   onSelectSession,
   onNewSession,
   onRenameSession,
+  showBackendHistory = true, // Default to showing backend history
 }: SessionSidebarProps) {
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -49,6 +48,16 @@ export function SessionSidebar({
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState('');
   const canRename = Boolean(onRenameSession);
+
+  // Fetch backend conversations
+  const { conversations, isLoading, fetchConversations, deleteConversation } = useConversationHistory();
+
+  // Refresh conversations when component mounts or after new session
+  useEffect(() => {
+    if (showBackendHistory) {
+      fetchConversations();
+    }
+  }, [showBackendHistory]);
 
   const startEditing = (session: Session) => {
     if (!canRename) return;
@@ -67,6 +76,37 @@ export function SessionSidebar({
     setEditingSessionId(null);
     setEditingValue('');
   };
+
+  const handleDeleteConversation = (conversationId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    toast('Are you sure you want to delete this conversation?', {
+      description: 'This action cannot be undone.',
+      action: {
+        label: 'Delete',
+        onClick: () => {
+          toast.promise(
+            async () => {
+              await deleteConversation(conversationId);
+              fetchConversations(); // Refresh list
+            },
+            {
+              loading: 'Deleting conversation...',
+              success: 'Conversation deleted',
+              error: 'Failed to delete conversation',
+            }
+          );
+        },
+      },
+      cancel: {
+        label: 'Cancel',
+        onClick: () => {},
+      },
+      duration: 5000,
+    });
+  };
+
+  // Use backend conversations if enabled, otherwise use local sessions
+  const displayItems = showBackendHistory ? conversations : sessions;
 
   return (
     <motion.aside
@@ -143,129 +183,175 @@ export function SessionSidebar({
       {/* Sessions List */}
       <ScrollArea className="flex-1 px-3 py-2">
         <div className="space-y-1.5">
-          {sessions.length === 0 ? (
+          {isLoading && showBackendHistory ? (
+            <div className="text-center py-8">
+              <div className="w-10 h-10 mx-auto rounded-full bg-muted flex items-center justify-center mb-3 animate-pulse">
+                <MessageSquare className="w-5 h-5 text-muted-foreground" />
+              </div>
+              {!isCollapsed && (
+                <p className="text-xs font-medium text-muted-foreground">Loading conversations...</p>
+              )}
+            </div>
+          ) : displayItems.length === 0 ? (
             <div className={cn("text-center py-8", isCollapsed && "px-0")}>
               <div className="w-10 h-10 mx-auto rounded-full bg-muted flex items-center justify-center mb-3">
                 <MessageSquare className="w-5 h-5 text-muted-foreground" />
               </div>
               {!isCollapsed && (
                 <>
-                  <p className="text-xs font-medium text-muted-foreground mb-1">No sessions yet</p>
+                  <p className="text-xs font-medium text-muted-foreground mb-1">No conversations yet</p>
                   <p className="text-[10px] text-muted-foreground">Start a new session to begin</p>
                 </>
               )}
             </div>
           ) : (
-            sessions.map((session, index) => (
-              <Tooltip key={session.id} delayDuration={0}>
-                <TooltipTrigger asChild>
-                  <motion.button
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    onClick={() => onSelectSession(session)}
-                    className={cn(
-                      "group w-full text-left rounded-xl transition-colors duration-200 border",
-                      isCollapsed ? "p-2 flex justify-center" : "px-3 py-2.5",
-                      currentSession?.id === session.id
-                        ? "bg-primary/10 border-primary/30 relative before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-primary"
-                        : "bg-transparent border-transparent hover:bg-muted"
-                    )}
-                  >
-                    <div className={cn("flex items-center", isCollapsed ? "justify-center" : "gap-3")}>
-                      <MessageSquare className={cn(
-                        "w-4 h-4 shrink-0 transition-colors",
-                        currentSession?.id === session.id ? "text-primary" : "text-muted-foreground"
-                      )} />
+            displayItems.map((item, index) => {
+              // Handle both backend ConversationSummary and local Session types
+              const isBackendConversation = showBackendHistory;
+              const itemId = item.id;
+              const itemTitle = item.title;
+              const itemDate = 'created_at' in item ? new Date(item.created_at) : new Date((item as Session).updatedAt);
+              const itemCost = 'totalCost' in item ? (item as Session).totalCost : 0;
+              const messageCount = 'message_count' in item ? item.message_count : (item as Session).messages?.length || 0;
 
-                      {!isCollapsed && (
-                        <div className="flex-1 min-w-0 overflow-hidden">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0 flex-1">
-                              {canRename && editingSessionId === session.id ? (
-                                <input
-                                  value={editingValue}
-                                  onChange={(e) => setEditingValue(e.target.value)}
-                                  onClick={(e) => e.stopPropagation()}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault();
-                                      commitEditing();
-                                    }
-                                    if (e.key === 'Escape') {
-                                      e.preventDefault();
-                                      cancelEditing();
-                                    }
+              return (
+                <Tooltip key={itemId} delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => {
+                        if (isBackendConversation) {
+                          // Navigate to main page - will need to load conversation details
+                          navigate(`/?conversation=${itemId}`);
+                        } else {
+                          onSelectSession(item as Session);
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          if (isBackendConversation) {
+                            navigate(`/?conversation=${itemId}`);
+                          } else {
+                            onSelectSession(item as Session);
+                          }
+                        }
+                      }}
+                      onContextMenu={(e) => {
+                        if (isBackendConversation) {
+                          e.preventDefault();
+                          handleDeleteConversation(itemId, e as any);
+                        }
+                      }}
+                      className={cn(
+                        "group w-full text-left rounded-xl transition-colors duration-200 border overflow-hidden cursor-pointer",
+                        isCollapsed ? "p-2 flex justify-center" : "px-3 py-2.5",
+                        currentSession?.id === itemId
+                          ? "bg-primary/10 border-primary/30 relative before:absolute before:left-0 before:top-1 before:bottom-1 before:w-1 before:rounded-r before:bg-primary"
+                          : "bg-transparent border-transparent hover:bg-muted"
+                      )}
+                    >
+                      <div className={cn("flex items-center w-full", isCollapsed ? "justify-center" : "gap-3")}>
+                        <MessageSquare className={cn(
+                          "w-4 h-4 shrink-0 transition-colors",
+                          currentSession?.id === itemId ? "text-primary" : "text-muted-foreground"
+                        )} />
+
+                        {!isCollapsed && (
+                          <div className="flex-1 min-w-0">
+                            {/* Title and Actions Row */}
+                            <div className="grid grid-cols-[1fr_auto] gap-2 mb-1 w-full items-center">
+                              {/* Title - takes available space */}
+                              <div className="min-w-0 overflow-hidden">
+                                {canRename && !isBackendConversation && editingSessionId === itemId ? (
+                                  <input
+                                    value={editingValue}
+                                    onChange={(e) => setEditingValue(e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        commitEditing();
+                                      }
+                                      if (e.key === 'Escape') {
+                                        e.preventDefault();
+                                        cancelEditing();
+                                      }
+                                    }}
+                                    onBlur={commitEditing}
+                                    className="w-full rounded-md border border-border bg-card px-2 py-1 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20 h-6"
+                                    autoFocus
+                                  />
+                                ) : (
+                                  <p className={cn(
+                                    "text-sm font-medium truncate block w-full",
+                                    currentSession?.id === itemId ? "text-foreground" : "text-foreground"
+                                  )}>
+                                    {itemTitle}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Action Buttons - fixed width */}
+                              <div className="flex items-center gap-1">
+                                {/* Trash icon */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteConversation(itemId, e);
                                   }}
-                                  onBlur={commitEditing}
-                                  className="w-full rounded-md border border-border bg-card px-2 py-1 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                                  autoFocus
-                                />
-                              ) : (
-                                <p className={cn(
-                                  "text-sm font-medium truncate mb-0.5",
-                                  currentSession?.id === session.id ? "text-foreground" : "text-foreground"
-                                )}>
-                                  {session.title}
-                                </p>
+                                  className="h-6 w-6 rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center transition-colors shrink-0"
+                                  aria-label="Delete conversation"
+                                  title="Delete conversation"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Metadata Row */}
+                            <div className={cn(
+                              "flex items-center gap-3 text-[10px]",
+                              currentSession?.id === itemId ? "text-muted-foreground" : "text-muted-foreground"
+                            )}>
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-2.5 h-2.5" />
+                                {itemDate.toLocaleDateString()}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <MessageSquare className="w-2.5 h-2.5" />
+                                {messageCount} msg{messageCount !== 1 ? 's' : ''}
+                              </span>
+                              {itemCost > 0 && (
+                                <span className="flex items-center gap-1">
+                                  <DollarSign className="w-2.5 h-2.5" />
+                                  ${itemCost.toFixed(3)}
+                                </span>
                               )}
                             </div>
-                            {canRename && (
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <button
-                                      type="button"
-                                      onClick={(e) => e.stopPropagation()}
-                                      className="h-7 w-7 rounded-md border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted flex items-center justify-center"
-                                      aria-label="Session options"
-                                    >
-                                      <MoreHorizontal className="h-4 w-4" />
-                                    </button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" side="right">
-                                    <DropdownMenuItem
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        startEditing(session);
-                                      }}
-                                    >
-                                      Rename
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </div>
-                            )}
                           </div>
-                          <div className={cn(
-                            "flex items-center gap-3 text-[10px]",
-                            currentSession?.id === session.id ? "text-muted-foreground" : "text-muted-foreground"
-                          )}>
-                            <span className="flex items-center gap-1">
-                              <Clock className="w-2.5 h-2.5" />
-                              {new Date(session.updatedAt).toLocaleDateString()}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <DollarSign className="w-2.5 h-2.5" />
-                              ${session.totalCost.toFixed(3)}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </motion.button>
-                </TooltipTrigger>
-                {isCollapsed && (
-                  <TooltipContent side="right" className="flex flex-col gap-1">
-                    <p className="font-medium">{session.title}</p>
-                    <div className="flex gap-3 text-xs text-muted-foreground">
-                      <span>{new Date(session.updatedAt).toLocaleDateString()}</span>
-                      <span>${session.totalCost.toFixed(3)}</span>
-                    </div>
-                  </TooltipContent>
-                )}
-              </Tooltip>
-            ))
+                        )}
+                      </div>
+                    </motion.div>
+                  </TooltipTrigger>
+                  {isCollapsed && (
+                    <TooltipContent side="right" className="flex flex-col gap-1">
+                      <p className="font-medium">{itemTitle}</p>
+                      <div className="flex gap-3 text-xs text-muted-foreground">
+                        <span>{itemDate.toLocaleDateString()}</span>
+                        <span>{messageCount} msgs</span>
+                        {itemCost > 0 && <span>${itemCost.toFixed(3)}</span>}
+                      </div>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              );
+            })
           )}
         </div>
       </ScrollArea>
@@ -285,17 +371,6 @@ export function SessionSidebar({
             {isDark ? <Sun className="h-4 w-4 text-primary" /> : <Moon className="h-4 w-4 text-primary" />}
             {!isCollapsed && <span className="font-medium">{isDark ? 'Light Mode' : 'Dark Mode'}</span>}
           </button>
-          {!isCollapsed ? (
-            <div className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg bg-muted text-xs text-muted-foreground">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-30"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-              </span>
-              <span className="font-medium">System Operational</span>
-            </div>
-          ) : (
-            <div className="h-2 w-2 rounded-full bg-primary ring-4 ring-border" />
-          )}
         </div>
       </div>
     </motion.aside>

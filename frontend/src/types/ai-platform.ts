@@ -4,6 +4,7 @@ export interface AIModel {
   id: string;
   name: string;
   provider: ModelProvider;
+  hostPlatform: 'aws_bedrock' | 'openai' | 'gcp_vertex';
   description: string;
   contextWindow: number;
   inputCostPer1k: number;
@@ -27,6 +28,10 @@ export interface ModelRun {
   timestamp: Date;
   status: 'pending' | 'running' | 'completed' | 'failed';
   error?: string;
+  accuracy?: number; // 0-100 score from backend
+  accuracyRationale?: string;
+  queryCategory?: string;
+  promptOptimization?: string;
 }
 
 export interface Message {
@@ -97,12 +102,6 @@ export interface AnalyticsData {
     percentage: number;
     color: string;
   }[];
-  efficiencyScores: {
-    modelId: string;
-    modelName: string;
-    score: number;
-    color: string;
-  }[];
   accuracyComparison: {
     modelId: string;
     modelName: string;
@@ -165,6 +164,17 @@ export interface CumulativeAnalytics {
     accuracy: number;
     totalCost: number;
     color: string;
+    todayCost?: number;
+  }[];
+  complexityAnalysis: {
+    queryCategory: string;
+    modelId: string;
+    modelName: string;
+    requestCount: number;
+    avgAccuracy: number;
+    avgLatency: number;
+    totalCost: number;
+    color: string;
   }[];
 }
 
@@ -196,4 +206,6 @@ export interface ExecutionConfig {
   selectedModels: string[];
   useHistory: boolean;
   maxBudget?: number;
+  guardrailId?: string;
+  evaluatorModel?: string;
 }
