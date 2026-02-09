@@ -28,18 +28,17 @@ app.add_middleware(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",
+        "https://ai-governance-liart.vercel.app",
+        "http://localhost:8080",
         "http://localhost:3000",
-        "http://127.0.0.1:8080",
-        "http://127.0.0.1:3000",
-        "*",  # Allow all origins for development
+        "http://localhost:8080",
+        "http://localhost:5173",
     ],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],
-    max_age=3600,  # Cache preflight requests for 1 hour
 )
+
 
 # Include API routes
 app.include_router(api_router, prefix=settings.API_V1_STR)
