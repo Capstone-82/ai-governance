@@ -15,7 +15,7 @@ import {
   Legend,
   Cell,
 } from 'recharts';
-import { Clock, Coins, FileText, Layers, Gauge } from 'lucide-react';
+import { Clock, Coins, FileText, Layers, Target } from 'lucide-react';
 
 interface AnalyticsGraphsProps {
   data: AnalyticsData;
@@ -59,7 +59,7 @@ export function AnalyticsGraphs({ data }: AnalyticsGraphsProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[200px]">
+            <div className="h-[240px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.tokenComparison} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -67,8 +67,9 @@ export function AnalyticsGraphs({ data }: AnalyticsGraphsProps) {
                   <YAxis
                     dataKey="modelName"
                     type="category"
-                    width={80}
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                    width={120}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                    interval={0}
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar dataKey="inputTokens" fill="hsl(var(--primary))" name="Input Tokens" radius={[0, 4, 4, 0]} />
@@ -87,7 +88,7 @@ export function AnalyticsGraphs({ data }: AnalyticsGraphsProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[200px]">
+            <div className="h-[240px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.tokenComparison} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
@@ -95,8 +96,9 @@ export function AnalyticsGraphs({ data }: AnalyticsGraphsProps) {
                   <YAxis
                     dataKey="modelName"
                     type="category"
-                    width={80}
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+                    width={120}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+                    interval={0}
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar dataKey="outputTokens" fill="hsl(var(--primary))" fillOpacity={0.55} name="Output Tokens" radius={[0, 4, 4, 0]} />
@@ -110,21 +112,22 @@ export function AnalyticsGraphs({ data }: AnalyticsGraphsProps) {
         <Card className="col-span-1">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Gauge className="w-4 h-4 text-primary" />
+              <Target className="w-4 h-4 text-primary" />
               Model Accuracy
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[200px]">
+            <div className="h-[240px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.accuracyComparison}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis
                     dataKey="modelName"
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
-                    angle={-20}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }}
+                    angle={-15}
                     textAnchor="end"
-                    height={50}
+                    height={60}
+                    interval={0}
                   />
                   <YAxis
                     domain={[0, 100]}
@@ -152,16 +155,17 @@ export function AnalyticsGraphs({ data }: AnalyticsGraphsProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[200px]">
+            <div className="h-[240px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.latencyComparison}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis
                     dataKey="modelName"
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
-                    angle={-20}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }}
+                    angle={-15}
                     textAnchor="end"
-                    height={50}
+                    height={60}
+                    interval={0}
                   />
                   <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }} />
                   <Tooltip content={<CustomTooltip />} />
@@ -185,16 +189,17 @@ export function AnalyticsGraphs({ data }: AnalyticsGraphsProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[200px]">
+            <div className="h-[240px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={data.costComparison}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis
                     dataKey="modelName"
-                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
-                    angle={-20}
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 9 }}
+                    angle={-15}
                     textAnchor="end"
-                    height={50}
+                    height={60}
+                    interval={0}
                   />
                   <YAxis
                     tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
@@ -239,50 +244,6 @@ export function AnalyticsGraphs({ data }: AnalyticsGraphsProps) {
                   </div>
                 </div>
               ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Efficiency Scores */}
-        <Card className="col-span-1 md:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Gauge className="w-4 h-4 text-primary" />
-              Efficiency Score
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadialBarChart
-                  cx="50%"
-                  cy="50%"
-                  innerRadius="20%"
-                  outerRadius="90%"
-                  barSize={15}
-                  data={data.efficiencyScores.map((item, index) => ({
-                    ...item,
-                    fill: item.color,
-                  }))}
-                  startAngle={180}
-                  endAngle={0}
-                >
-                  <RadialBar
-                    background
-                    dataKey="score"
-                    cornerRadius={10}
-                  />
-                  <Legend
-                    iconSize={10}
-                    layout="horizontal"
-                    verticalAlign="bottom"
-                    formatter={(value, entry: any) => (
-                      <span className="text-xs text-muted-foreground">{entry.payload.modelName}</span>
-                    )}
-                  />
-                  <Tooltip content={<CustomTooltip />} />
-                </RadialBarChart>
-              </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>

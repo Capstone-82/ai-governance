@@ -12,5 +12,5 @@ class Conversation(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     
-    # Relationship
-    messages: List["Message"] = Relationship(back_populates="conversation")
+    # Relationship with cascade delete
+    messages: List["Message"] = Relationship(back_populates="conversation", sa_relationship_kwargs={"cascade": "all, delete-orphan"})

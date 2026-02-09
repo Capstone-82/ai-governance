@@ -16,6 +16,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { useState } from 'react';
+import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 
 interface ModelResultCardProps {
   run: ModelRun;
@@ -50,14 +51,14 @@ export function ModelResultCard({ run, index, isRecommended, recommendationType 
       )}>
         <CardHeader className="p-4 space-y-0 pb-3">
           <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
               <div
-                className="w-2.5 h-2.5 rounded-full ring-4 ring-current/10"
+                className="w-2.5 h-2.5 rounded-full ring-4 ring-current/10 flex-shrink-0"
                 style={{ backgroundColor: model.color, color: model.color }}
               />
-              <div>
-                <h3 className="font-semibold text-sm leading-none mb-1">{model.name}</h3>
-                <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium">{model.provider}</p>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-semibold text-sm leading-none mb-1 truncate">{model.name}</h3>
+                <p className="text-[11px] text-muted-foreground uppercase tracking-wider font-medium truncate">{model.provider}</p>
               </div>
             </div>
             <button
@@ -72,18 +73,24 @@ export function ModelResultCard({ run, index, isRecommended, recommendationType 
           <div className="grid grid-cols-2 gap-y-2 gap-x-4 mt-4 pt-3 border-t border-border/50">
             <div className="flex items-center gap-2 text-xs">
               <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="font-medium text-foreground/80">{run.latencyMs}ms</span>
+              <span className="font-medium text-foreground/80">{Math.round(run.latencyMs)}ms</span>
             </div>
             <div className="flex items-center gap-2 text-xs">
               <Coins className="w-3.5 h-3.5 text-muted-foreground" />
               <span className="font-medium text-foreground/80">${run.cost.toFixed(5)}</span>
             </div>
-            <div className="flex items-center gap-2 text-xs col-span-2">
+            <div className="flex items-center gap-2 text-xs">
               <FileText className="w-3.5 h-3.5 text-muted-foreground" />
               <span className="text-muted-foreground">
                 <span className="text-foreground/80">{run.inputTokens}</span> in · <span className="text-foreground/80">{run.outputTokens}</span> out
               </span>
             </div>
+            {run.accuracy !== undefined && (
+              <div className="flex items-center gap-2 text-xs">
+                <Sparkles className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="font-medium text-foreground/80">{run.accuracy}% accuracy</span>
+              </div>
+            )}
           </div>
         </CardHeader>
 
@@ -106,8 +113,8 @@ export function ModelResultCard({ run, index, isRecommended, recommendationType 
                 className="overflow-hidden"
               >
                 <div className="px-4 pb-4 pt-1">
-                  <div className="bg-muted/30 rounded-lg p-3 text-sm leading-relaxed text-foreground/90 font-normal">
-                    {run.response}
+                  <div className="bg-muted/30 rounded-lg p-3 text-sm leading-relaxed text-foreground/90 font-normal max-h-[500px] w-full overflow-y-auto overflow-x-hidden">
+                    <MarkdownRenderer content={run.response} />
                   </div>
                 </div>
               </motion.div>
@@ -146,13 +153,14 @@ export function ResultsComparison({ runs, recommendedModelId, recommendationType
 
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
         {runs.map((run, index) => (
-          <ModelResultCard
-            key={run.id}
-            run={run}
-            index={index}
-            isRecommended={run.modelId === recommendedModelId}
-            recommendationType={run.modelId === recommendedModelId ? recommendationType : undefined}
-          />
+          <div key={run.id} className="min-w-0">
+            <ModelResultCard
+              run={run}
+              index={index}
+              isRecommended={run.modelId === recommendedModelId}
+              recommendationType={run.modelId === recommendedModelId ? recommendationType : undefined}
+            />
+          </div>
         ))}
       </div>
     </div>

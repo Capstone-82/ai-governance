@@ -16,4 +16,4 @@ class Message(SQLModel, table=True):
     
     # Relationships
     conversation: "Conversation" = Relationship(back_populates="messages")
-    telemetry: Optional["GovernanceTelemetry"] = Relationship(back_populates="message")
+    telemetry: Optional["GovernanceTelemetry"] = Relationship(back_populates="message", sa_relationship_kwargs={"cascade": "all, delete-orphan"})

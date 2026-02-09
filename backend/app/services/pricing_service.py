@@ -75,13 +75,19 @@ class PricingService:
         r = req_id.lower().replace("-", "").replace(":", "").replace(".", "")
         
         if "sonnet" in j and "sonnet" in r:
+            if "4" in json_name or "4" in r:
+                return True
             if "3.5" in json_name and ("3-5" in req_id or "3.5" in req_id or "35" in r):
                 return True
             if "3" in json_name and "3.5" not in json_name and ("3" in req_id and "3-5" not in req_id):
                  return True
         
         if "haiku" in j and "haiku" in r:
-             if "3.5" in json_name and ("3-5" in req_id or "3.5" in req_id or "35" in r):
+            if "3.5" in json_name and ("3-5" in req_id or "3.5" in req_id or "35" in r):
+                return True
+
+        if "opus" in j and "opus" in r:
+            if "4" in json_name or "4" in r:
                 return True
 
         if "llama" in r: return False # Safety check
@@ -94,11 +100,15 @@ class PricingService:
         """
         families = self.meta_pricing.get("models", {})
         target_family = None
-        if "llama3" in model_name.lower() or "llama-3" in model_name.lower():
+        if "llama4" in model_name.lower() or "llama-4" in model_name.lower():
+             target_family = "llama_4"
+        elif "llama3" in model_name.lower() or "llama-3" in model_name.lower():
              if "beta" in model_name.lower() or "3.1" in model_name or "3-1" in model_name:
                  target_family = "llama_3_1"
              elif "3.2" in model_name or "3-2" in model_name:
                  target_family = "llama_3_2"
+             elif "3.3" in model_name or "3-3" in model_name:
+                 target_family = "llama_3_3"
              else:
                  target_family = "llama_3" 
         elif "llama2" in model_name.lower():
@@ -114,7 +124,7 @@ class PricingService:
         return 0.0003 / 1000, 0.0006 / 1000
 
     def _match_size(self, json_model_name: str, req_model_id: str) -> bool:
-        sizes = ["1b", "3b", "8b", "70b", "405b", "11b", "90b"]
+        sizes = ["1b", "3b", "8b", "70b", "405b", "11b", "90b", "17b"]
         json_lower = json_model_name.lower()
         req_lower = req_model_id.lower()
         for size in sizes:

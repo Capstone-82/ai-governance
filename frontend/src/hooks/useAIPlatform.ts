@@ -12,7 +12,15 @@ import {
   ExecutionConfig
 } from '@/types/ai-platform';
 import { AI_MODELS, getModelById } from '@/data/models';
-import { generateMockCumulativeAnalytics } from '@/data/mockAnalyticsData';
+import api, { BackendModelConfig, GovernanceLog } from '@/services/api';
+import { useToast } from '@/hooks/use-toast';
+import {
+  generateAnalytics,
+  generateRecommendations,
+  generateConfidence,
+  generateDivergence,
+  analyzePrompt
+} from '@/utils/analytics';
 
 const generateId = () => Math.random().toString(36).substring(2, 15);
 const SESSION_STORAGE_KEY = 'ai-platform-sessions';
@@ -45,21 +53,8 @@ const loadSessionsFromStorage = (): Session[] => {
   }
 };
 
-const createMockResponse = (modelId: string, prompt: string): string => {
-  const model = getModelById(modelId);
-  const responses: Record<string, string> = {
-    'claude-3-5-sonnet': `I'll provide a comprehensive analysis of your request.\n\n${prompt.slice(0, 50)}...\n\nBased on careful reasoning, here are the key points:\n\n1. **Primary Consideration**: The core issue requires careful evaluation of multiple factors.\n\n2. **Analysis**: Looking at this from different angles, we can identify several important patterns.\n\n3. **Recommendation**: Based on the evidence, I suggest a structured approach that balances efficiency with thoroughness.\n\nThis analysis considers both immediate needs and long-term implications.`,
-    'claude-3-haiku': `Quick response to your query:\n\n${prompt.slice(0, 30)}...\n\n• Key point 1: Direct answer\n• Key point 2: Supporting detail\n• Key point 3: Actionable next step\n\nLet me know if you need more detail.`,
-    'gemini-2-flash': `Here's a rapid analysis:\n\n${prompt.slice(0, 40)}...\n\n**Quick Summary:**\n- Efficient processing complete\n- Main findings identified\n- Ready for follow-up questions\n\nMultimodal context considered where applicable.`,
-    'gemini-2-pro': `Detailed analysis with extended context:\n\n${prompt.slice(0, 50)}...\n\n## Comprehensive Review\n\nUtilizing the extended context window, I've analyzed multiple dimensions:\n\n1. **Deep Analysis**: Thorough examination of all factors\n2. **Cross-referencing**: Patterns identified across domains\n3. **Synthesis**: Integrated conclusions from multiple perspectives\n\nThis response leverages the full reasoning capabilities.`,
-    'gpt-4o': `I'll address your request thoughtfully.\n\n${prompt.slice(0, 45)}...\n\n### Analysis\n\nAfter considering your query, here's my response:\n\n1. **Context Understanding**: Clear comprehension of the task\n2. **Balanced Approach**: Weighing multiple factors\n3. **Practical Output**: Actionable recommendations\n\nThis combines creative and analytical thinking.`,
-    'gpt-4o-mini': `Efficient response:\n\n${prompt.slice(0, 35)}...\n\n• Answer: Direct and concise\n• Details: Essential information included\n• Next: Ready for clarification\n\nCost-effective processing complete.`,
-    'claude-bedrock': `AWS Bedrock Response:\n\n${prompt.slice(0, 50)}...\n\n**Enterprise Analysis:**\n\n1. Secure processing within AWS infrastructure\n2. Compliance-ready output\n3. Integration-friendly format\n\nFull Claude capabilities via Bedrock.`,
-  };
-  return responses[modelId] || `Response from ${model?.name || 'Unknown Model'}...`;
-};
-
 export function useAIPlatform() {
+  const { toast } = useToast();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [currentSession, setCurrentSession] = useState<Session | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -68,6 +63,7 @@ export function useAIPlatform() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [confidence, setConfidence] = useState<DecisionConfidence | null>(null);
   const [divergence, setDivergence] = useState<DivergenceAnalysis | null>(null);
+  const [governanceContext, setGovernanceContext] = useState<'aws' | 'azure' | 'gcp'>('aws');
 
   useEffect(() => {
     const storedSessions = loadSessionsFromStorage();
@@ -88,6 +84,23 @@ export function useAIPlatform() {
     if (typeof window === 'undefined') return;
     if (currentSession) {
       sessionStorage.setItem(CURRENT_SESSION_KEY, currentSession.id);
+
+      // Auto-migrate stale IDs for current session
+      const staleToNew: Record<string, string> = {
+        'anthropic.claude-3-5-sonnet-20240620-v1:0': 'anthropic.claude-sonnet-4-20250514-v1:0',
+        'meta.llama4-maverick-17b-v1:0': 'meta.llama4-maverick-17b-instruct-v1:0',
+        'meta.llama4-scout-17b-v1:0': 'meta.llama4-scout-17b-instruct-v1:0'
+      };
+
+      const hasStale = currentSession.selectedModels.some(id => staleToNew[id]);
+      if (hasStale) {
+        const migrated = currentSession.selectedModels.map(id => staleToNew[id] || id);
+        setCurrentSession(prev => prev ? { ...prev, selectedModels: migrated } : null);
+
+        setSessions(prev => prev.map(s =>
+          s.id === currentSession.id ? { ...s, selectedModels: migrated } : s
+        ));
+      }
     } else {
       sessionStorage.removeItem(CURRENT_SESSION_KEY);
     }
@@ -100,7 +113,10 @@ export function useAIPlatform() {
       createdAt: new Date(),
       updatedAt: new Date(),
       messages: [],
-      selectedModels: ['claude-3-5-sonnet', 'gemini-2-flash', 'gpt-4o'],
+      selectedModels: [
+        'gemini-2.5-flash',
+        'gpt-4o'
+      ],
       totalTokens: 0,
       totalCost: 0,
       isTokenOptimized: false,
@@ -125,9 +141,12 @@ export function useAIPlatform() {
 
   const executePrompt = useCallback(async (
     prompt: string,
-    config: ExecutionConfig
+    config: ExecutionConfig,
+    session?: Session
   ) => {
-    if (!currentSession) return;
+    // Use provided session or fall back to currentSession
+    const targetSession = session || currentSession;
+    if (!targetSession) return;
 
     setIsExecuting(true);
 
@@ -138,291 +157,322 @@ export function useAIPlatform() {
       timestamp: new Date(),
     };
 
-    // Simulate parallel model execution
-    const modelRuns: ModelRun[] = await Promise.all(
-      config.selectedModels.map(async (modelId) => {
+    try {
+      // Prepare backend request
+      const backendModels: BackendModelConfig[] = config.selectedModels.map(modelId => {
         const model = getModelById(modelId);
-        if (!model) throw new Error(`Model ${modelId} not found`);
-
-        // Simulate variable latency
-        const latencyVariation = 0.7 + Math.random() * 0.6;
-        const simulatedLatency = Math.round(model.avgLatency * latencyVariation);
-
-        await new Promise(resolve => setTimeout(resolve, simulatedLatency));
-
-        const response = createMockResponse(modelId, prompt);
-        const inputTokens = Math.round(prompt.length / 4);
-        const outputTokens = Math.round(response.length / 4);
-        const cost = (inputTokens / 1000 * model.inputCostPer1k) +
-          (outputTokens / 1000 * model.outputCostPer1k);
-
         return {
-          id: generateId(),
-          modelId,
-          response,
-          inputTokens,
-          outputTokens,
-          latencyMs: simulatedLatency,
-          cost,
-          contextUsage: ((inputTokens + outputTokens) / model.contextWindow) * 100,
-          timestamp: new Date(),
-          status: 'completed' as const,
+          host_platform: model?.hostPlatform || 'aws_bedrock',
+          model_id: modelId,
         };
-      })
-    );
-
-    const assistantMessage: Message = {
-      id: generateId(),
-      role: 'assistant',
-      content: 'Multi-model response',
-      timestamp: new Date(),
-      modelRuns,
-    };
-
-    // Update session
-    const updatedSession: Session = {
-      ...currentSession,
-      title: prompt.slice(0, 40) + (prompt.length > 40 ? '...' : ''),
-      updatedAt: new Date(),
-      messages: [...currentSession.messages, userMessage, assistantMessage],
-      totalTokens: currentSession.totalTokens + modelRuns.reduce((sum, run) => sum + run.inputTokens + run.outputTokens, 0),
-      totalCost: currentSession.totalCost + modelRuns.reduce((sum, run) => sum + run.cost, 0),
-      isTokenOptimized: config.useHistory && currentSession.messages.length > 0,
-    };
-
-    setCurrentSession(updatedSession);
-    setSessions(prev => prev.map(s => s.id === updatedSession.id ? updatedSession : s));
-
-    // Generate analytics
-    generateAnalytics(modelRuns);
-    generateRecommendations(modelRuns);
-    generateConfidence(modelRuns);
-    generateDivergence(modelRuns);
-    analyzePrompt(prompt);
-
-    setIsExecuting(false);
-  }, [currentSession]);
-
-  const generateAnalytics = (runs: ModelRun[]) => {
-    const analyticsData: AnalyticsData = {
-      tokenComparison: runs.map(run => {
-        const model = getModelById(run.modelId);
-        return {
-          modelId: run.modelId,
-          modelName: model?.name || run.modelId,
-          inputTokens: run.inputTokens,
-          outputTokens: run.outputTokens,
-          color: model?.color || '#888',
-        };
-      }),
-      latencyComparison: runs.map(run => {
-        const model = getModelById(run.modelId);
-        return {
-          modelId: run.modelId,
-          modelName: model?.name || run.modelId,
-          latency: run.latencyMs,
-          color: model?.color || '#888',
-        };
-      }),
-      costComparison: runs.map(run => {
-        const model = getModelById(run.modelId);
-        return {
-          modelId: run.modelId,
-          modelName: model?.name || run.modelId,
-          cost: run.cost,
-          color: model?.color || '#888',
-        };
-      }),
-      contextUsage: runs.map(run => {
-        const model = getModelById(run.modelId);
-        return {
-          modelId: run.modelId,
-          modelName: model?.name || run.modelId,
-          used: run.inputTokens + run.outputTokens,
-          available: model?.contextWindow || 100000,
-          percentage: run.contextUsage,
-          color: model?.color || '#888',
-        };
-      }),
-      efficiencyScores: runs.map(run => {
-        const model = getModelById(run.modelId);
-        // Efficiency = quality per cost-latency unit (higher is better)
-        const score = Math.round((run.outputTokens / run.inputTokens) * (1000 / run.latencyMs) * (0.01 / run.cost) * 100);
-        return {
-          modelId: run.modelId,
-          modelName: model?.name || run.modelId,
-          score: Math.min(100, Math.max(0, score)),
-          color: model?.color || '#888',
-        };
-      }),
-      accuracyComparison: runs.map(run => {
-        const model = getModelById(run.modelId);
-        // Simulate accuracy score based on model capabilities complexity
-        const baseAccuracy = model?.capabilities.includes('reasoning') ? 95 : 90;
-        const variation = Math.random() * 4;
-        return {
-          modelId: run.modelId,
-          modelName: model?.name || run.modelId,
-          accuracy: Math.min(99.9, baseAccuracy + variation),
-          color: model?.color || '#888',
-        };
-      }),
-    };
-    setAnalytics(analyticsData);
-  };
-
-  const generateRecommendations = (runs: ModelRun[]) => {
-    const sorted = {
-      bySpeed: [...runs].sort((a, b) => a.latencyMs - b.latencyMs),
-      byCost: [...runs].sort((a, b) => a.cost - b.cost),
-      byContext: [...runs].sort((a, b) => {
-        const modelA = getModelById(a.modelId);
-        const modelB = getModelById(b.modelId);
-        return (modelB?.contextWindow || 0) - (modelA?.contextWindow || 0);
-      }),
-      byQuality: [...runs].sort((a, b) => b.outputTokens - a.outputTokens),
-    };
-
-    const newRecs: Recommendation[] = [];
-
-    if (sorted.bySpeed[0]) {
-      const model = getModelById(sorted.bySpeed[0].modelId);
-      newRecs.push({
-        id: generateId(),
-        type: 'speed',
-        modelId: sorted.bySpeed[0].modelId,
-        title: 'Fastest Response',
-        description: `${model?.name} delivered the quickest response at ${sorted.bySpeed[0].latencyMs}ms`,
-        metric: `${sorted.bySpeed[0].latencyMs}ms`,
-        confidence: 92,
-        icon: '⚡',
       });
-    }
 
-    if (sorted.byCost[0]) {
-      const model = getModelById(sorted.byCost[0].modelId);
-      const savings = sorted.byCost[runs.length - 1].cost - sorted.byCost[0].cost;
-      newRecs.push({
-        id: generateId(),
-        type: 'cost',
-        modelId: sorted.byCost[0].modelId,
-        title: 'Most Cost Efficient',
-        description: `${model?.name} offers ${Math.round((savings / sorted.byCost[runs.length - 1].cost) * 100)}% cost savings`,
-        metric: `$${sorted.byCost[0].cost.toFixed(6)}`,
-        confidence: 88,
-        icon: '💰',
+      // Call real backend API
+      const backendResponses: GovernanceLog[] = await api.governance.batchAnalyze({
+        query: prompt,
+        governance_context: governanceContext,
+        models: backendModels,
+        guardrailId: config.guardrailId,
+        evaluatorModel: config.evaluatorModel,
       });
-    }
 
-    if (sorted.byContext[0]) {
-      const model = getModelById(sorted.byContext[0].modelId);
-      newRecs.push({
-        id: generateId(),
-        type: 'context',
-        modelId: sorted.byContext[0].modelId,
-        title: 'Best for Long Context',
-        description: `${model?.name} supports up to ${(model?.contextWindow || 0).toLocaleString()} tokens`,
-        metric: `${((model?.contextWindow || 0) / 1000).toFixed(0)}K`,
-        confidence: 95,
-        icon: '📚',
+      // Convert backend responses to frontend ModelRun format
+      const modelRuns: ModelRun[] = backendResponses.map((log) => {
+        const model = getModelById(log.model_id);
+        return {
+          id: log.id,
+          modelId: log.model_id,
+          response: log.response_text,
+          inputTokens: log.usage.input_tokens,
+          outputTokens: log.usage.output_tokens,
+          latencyMs: log.usage.latency_ms,
+          cost: log.cost.total_cost,
+          contextUsage: model
+            ? ((log.usage.input_tokens + log.usage.output_tokens) / model.contextWindow) * 100
+            : 0,
+          timestamp: new Date(log.ended_at),
+          status: log.success ? 'completed' : 'failed',
+          error: log.error_message,
+          accuracy: log.accuracy.score,
+          accuracyRationale: log.accuracy.rationale,
+          queryCategory: log.accuracy.query_category,
+          promptOptimization: log.accuracy.prompt_optimization,
+        };
       });
-    }
 
-    if (sorted.byQuality[0]) {
-      const model = getModelById(sorted.byQuality[0].modelId);
-      newRecs.push({
+      const assistantMessage: Message = {
         id: generateId(),
-        type: 'quality',
-        modelId: sorted.byQuality[0].modelId,
-        title: 'Best for Quality',
-        description: `${model?.name} provides most comprehensive responses`,
-        metric: `${sorted.byQuality[0].outputTokens} tokens`,
-        confidence: 85,
-        icon: '🧠',
+        role: 'assistant',
+        content: 'Multi-model response',
+        timestamp: new Date(),
+        modelRuns,
+      };
+
+      // Update session
+      const updatedSession: Session = {
+        ...targetSession,
+        title: targetSession.messages.length === 0
+          ? (prompt.slice(0, 40) + (prompt.length > 40 ? '...' : ''))
+          : targetSession.title,
+        updatedAt: new Date(),
+        messages: [...targetSession.messages, userMessage, assistantMessage],
+        totalTokens: targetSession.totalTokens + modelRuns.reduce((sum, run) => sum + run.inputTokens + run.outputTokens, 0),
+        totalCost: targetSession.totalCost + modelRuns.reduce((sum, run) => sum + run.cost, 0),
+        isTokenOptimized: config.useHistory && targetSession.messages.length > 0,
+      };
+
+      setCurrentSession(updatedSession);
+
+      setSessions(prev => {
+        const index = prev.findIndex(s => s.id === updatedSession.id);
+        if (index >= 0) {
+          return prev.map(s => s.id === updatedSession.id ? updatedSession : s);
+        } else {
+          return [updatedSession, ...prev];
+        }
       });
-    }
 
-    setRecommendations(newRecs);
-  };
+      // Generate analytics
+      setAnalytics(generateAnalytics(modelRuns));
+      setRecommendations(generateRecommendations(modelRuns));
+      setConfidence(generateConfidence(modelRuns));
+      setDivergence(generateDivergence(modelRuns));
+      setPromptSuggestions(analyzePrompt(prompt));
 
-  const generateConfidence = (runs: ModelRun[]) => {
-    // Calculate similarity between outputs
-    const avgLatency = runs.reduce((sum, r) => sum + r.latencyMs, 0) / runs.length;
-    const latencyStability = 100 - Math.min(100, (Math.max(...runs.map(r => r.latencyMs)) - Math.min(...runs.map(r => r.latencyMs))) / avgLatency * 50);
+      toast({
+        title: "Analysis Complete",
+        description: `Received responses from ${modelRuns.length} models`,
+      });
 
-    const avgTokens = runs.reduce((sum, r) => sum + r.outputTokens, 0) / runs.length;
-    const outputConsistency = 100 - Math.min(100, (Math.max(...runs.map(r => r.outputTokens)) - Math.min(...runs.map(r => r.outputTokens))) / avgTokens * 50);
+    } catch (error) {
+      console.error('Execution error:', error);
 
-    const overallScore = Math.round((latencyStability + outputConsistency) / 2);
+      let errorMessage = "Failed to execute prompt";
+      let errorTitle = "Error";
 
-    setConfidence({
-      score: overallScore,
-      level: overallScore >= 75 ? 'high' : overallScore >= 50 ? 'medium' : 'low',
-      factors: [
-        { name: 'Latency Stability', score: Math.round(latencyStability), description: 'Consistency of response times' },
-        { name: 'Output Consistency', score: Math.round(outputConsistency), description: 'Similarity in response lengths' },
-        { name: 'Model Agreement', score: Math.round((latencyStability + outputConsistency) / 2), description: 'Overall alignment between models' },
-      ],
-    });
-  };
+      if (error instanceof Error) {
+        // Check if it's a JSON error string from our API wrapper
+        // e.g. "Guardrail Violation: ..." or explicit JSON format
+        errorMessage = error.message;
 
-  const generateDivergence = (runs: ModelRun[]) => {
-    const comparisons = [];
-    for (let i = 0; i < runs.length; i++) {
-      for (let j = i + 1; j < runs.length; j++) {
-        const model1 = getModelById(runs[i].modelId);
-        const model2 = getModelById(runs[j].modelId);
-        // Simplified similarity based on output length ratio
-        const similarity = Math.round(100 - Math.abs(runs[i].outputTokens - runs[j].outputTokens) / Math.max(runs[i].outputTokens, runs[j].outputTokens) * 100);
-        comparisons.push({
-          model1: model1?.name || runs[i].modelId,
-          model2: model2?.name || runs[j].modelId,
-          similarity,
-        });
+        // 1. Clean up "API Error (400): " prefix from api.ts
+        if (errorMessage.includes("API Error")) {
+          const parts = errorMessage.split("): ");
+          if (parts.length > 1) {
+            errorMessage = parts[1];
+          }
+        }
+
+        // 2. Parse JSON content if present (e.g. {"detail": "..."})
+        try {
+          if (errorMessage.trim().startsWith("{")) {
+            const json = JSON.parse(errorMessage);
+            if (json.detail) {
+              errorMessage = json.detail;
+            }
+          }
+        } catch (e) {
+          // Not valid JSON, keep original string
+        }
+
+        // 3. Specialized handling for Guardrail Violations
+        if (errorMessage.includes("Guardrail Violation")) {
+          errorTitle = "Blocked by Guardrail";
+          // Remove the technical prefix if present
+          errorMessage = errorMessage.replace("Guardrail Violation:", "").trim();
+        }
       }
-    }
 
-    const avgSimilarity = comparisons.reduce((sum, c) => sum + c.similarity, 0) / comparisons.length;
-
-    setDivergence({
-      level: avgSimilarity >= 80 ? 'low' : avgSimilarity >= 60 ? 'medium' : 'high',
-      score: Math.round(100 - avgSimilarity),
-      details: avgSimilarity >= 80
-        ? 'Models show strong agreement on this response.'
-        : avgSimilarity >= 60
-          ? 'Some variation detected between model outputs.'
-          : 'Significant differences between model responses - review recommended.',
-      modelComparisons: comparisons,
-    });
-  };
-
-  const analyzePrompt = (prompt: string) => {
-    const suggestions: PromptSuggestion[] = [];
-
-    if (prompt.length > 500) {
-      suggestions.push({
-        id: generateId(),
-        type: 'length',
-        original: prompt.slice(0, 100) + '...',
-        suggested: 'Consider breaking into smaller, focused prompts',
-        tokenSavings: Math.round(prompt.length * 0.15 / 4),
-        description: 'Long prompts can be optimized by removing redundant context',
+      toast({
+        title: errorTitle,
+        description: errorMessage,
+        variant: "destructive",
       });
+    } finally {
+      setIsExecuting(false);
     }
+  }, [currentSession, governanceContext, toast]);
 
-    if (prompt.includes('please') || prompt.includes('kindly') || prompt.includes('would you')) {
-      suggestions.push({
-        id: generateId(),
-        type: 'redundancy',
-        original: 'Polite phrases detected',
-        suggested: 'Use direct instructions for token efficiency',
-        tokenSavings: Math.round(15),
-        description: 'Removing conversational phrases saves tokens without affecting output',
+  const executePromptStreaming = useCallback(async (
+    prompt: string,
+    config: ExecutionConfig,
+    session?: Session,
+    onProgress?: (completed: number, total: number) => void
+  ) => {
+    const targetSession = session || currentSession;
+    if (!targetSession) return;
+
+    setIsExecuting(true);
+
+    const userMessage: Message = {
+      id: generateId(),
+      role: 'user',
+      content: prompt,
+      timestamp: new Date(),
+    };
+
+    try {
+      const backendModels: BackendModelConfig[] = config.selectedModels.map(modelId => {
+        const model = getModelById(modelId);
+        return {
+          host_platform: model?.hostPlatform || 'aws_bedrock',
+          model_id: modelId,
+        };
       });
-    }
 
-    setPromptSuggestions(suggestions);
-  };
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+      const response = await fetch(`${API_BASE_URL}/api/v1/governance/analyze/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(config.guardrailId ? { 'x-aws-guardrail-id': config.guardrailId } : {}),
+        },
+        body: JSON.stringify({
+          query: prompt,
+          governance_context: governanceContext,
+          models: backendModels,
+          evaluator_model: config.evaluatorModel,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `Stream failed: ${response.statusText}`;
+        try {
+          const json = JSON.parse(errorText);
+          if (json.detail) {
+            errorMessage = json.detail;
+          }
+        } catch (e) {
+          // ignore parsing error
+        }
+        throw new Error(errorMessage);
+      }
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) {
+        throw new Error('Stream reader not available');
+      }
+
+      const modelRuns: ModelRun[] = [];
+      let total = config.selectedModels.length;
+      let completed = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6));
+
+            if (data.type === 'start') {
+              total = data.total;
+              onProgress?.(0, total);
+            } else if (data.type === 'result') {
+              const log: GovernanceLog = data.data;
+              const model = getModelById(log.model_id);
+
+              const modelRun: ModelRun = {
+                id: log.id,
+                modelId: log.model_id,
+                response: log.response_text,
+                inputTokens: log.usage.input_tokens,
+                outputTokens: log.usage.output_tokens,
+                latencyMs: log.usage.latency_ms,
+                cost: log.cost.total_cost,
+                contextUsage: model
+                  ? ((log.usage.input_tokens + log.usage.output_tokens) / model.contextWindow) * 100
+                  : 0,
+                timestamp: new Date(log.ended_at),
+                status: log.success ? 'completed' : 'failed',
+                error: log.error_message,
+                accuracy: log.accuracy.score,
+                accuracyRationale: log.accuracy.rationale,
+                queryCategory: log.accuracy.query_category,
+                promptOptimization: log.accuracy.prompt_optimization,
+              };
+
+              modelRuns.push(modelRun);
+              completed++;
+              onProgress?.(completed, total);
+
+              // Update session progressively
+              const assistantMessage: Message = {
+                id: generateId(),
+                role: 'assistant',
+                content: 'Multi-model response',
+                timestamp: new Date(),
+                modelRuns: [...modelRuns],
+              };
+
+              const updatedSession: Session = {
+                ...targetSession,
+                title: targetSession.messages.length === 0
+                  ? (prompt.slice(0, 40) + (prompt.length > 40 ? '...' : ''))
+                  : targetSession.title,
+                updatedAt: new Date(),
+                messages: [...targetSession.messages.filter(m => m.role !== 'assistant' || m.id !== assistantMessage.id), userMessage, assistantMessage],
+                totalTokens: targetSession.totalTokens + modelRuns.reduce((sum, run) => sum + run.inputTokens + run.outputTokens, 0),
+                totalCost: targetSession.totalCost + modelRuns.reduce((sum, run) => sum + run.cost, 0),
+                isTokenOptimized: config.useHistory && targetSession.messages.length > 0,
+              };
+
+              setCurrentSession(updatedSession);
+              setSessions(prev => {
+                const index = prev.findIndex(s => s.id === updatedSession.id);
+                if (index >= 0) {
+                  return prev.map(s => s.id === updatedSession.id ? updatedSession : s);
+                } else {
+                  return [updatedSession, ...prev];
+                }
+              });
+
+              // Update analytics progressively
+              setAnalytics(generateAnalytics(modelRuns));
+              setRecommendations(generateRecommendations(modelRuns));
+              setConfidence(generateConfidence(modelRuns));
+              setDivergence(generateDivergence(modelRuns));
+              setPromptSuggestions(analyzePrompt(prompt));
+            } else if (data.type === 'complete') {
+              toast({
+                title: "Analysis Complete",
+                description: `Received responses from ${modelRuns.length} models`,
+              });
+            } else if (data.type === 'error') {
+              throw new Error(data.message);
+            }
+          }
+        }
+      }
+
+    } catch (error) {
+      console.error('Streaming error:', error);
+
+      let errorMessage = "Failed to execute prompt";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsExecuting(false);
+    }
+  }, [currentSession, governanceContext, toast]);
+
+
+
+
 
   const estimateCost = (prompt: string, modelIds: string[]): number => {
     const inputTokens = Math.round(prompt.length / 4);
@@ -438,258 +488,175 @@ export function useAIPlatform() {
 
   // Generate cumulative analytics across all sessions
   const cumulativeAnalytics = useMemo((): CumulativeAnalytics => {
-    // Get base mock data and merge with real data
-    const mockData = generateMockCumulativeAnalytics();
-
-    // If no sessions exist, return mock data for demonstration
     if (sessions.length === 0) {
-      return mockData;
+      // Return empty state when no sessions
+      return {
+        totalQueries: 0,
+        totalTokensUsed: 0,
+        totalCostIncurred: 0,
+        averageLatency: 0,
+        successRate: 0,
+        failureRate: 0,
+        modelUsageDistribution: [],
+        modelMetrics: [],
+        timeBasedTrends: {
+          daily: [],
+          weekly: [],
+          monthly: [],
+        },
+        performanceMetrics: {
+          totalInputTokens: 0,
+          totalOutputTokens: 0,
+          averageCostPerQuery: 0,
+          averageTokensPerQuery: 0,
+          peakLatency: 0,
+          minLatency: 0,
+        },
+        complexityAnalysis: [],
+      };
     }
 
+    // Collect all model runs from all sessions
     const allRuns: ModelRun[] = [];
-    const allMessages: Message[] = [];
-
     sessions.forEach(session => {
       session.messages.forEach(message => {
-        allMessages.push(message);
         if (message.modelRuns) {
           allRuns.push(...message.modelRuns);
         }
       });
     });
 
-    const totalQueries = sessions.reduce((sum, session) =>
-      sum + session.messages.filter(m => m.role === 'user').length, 0);
+    if (allRuns.length === 0) {
+      // Return empty state when no runs
+      return {
+        totalQueries: 0,
+        totalTokensUsed: 0,
+        totalCostIncurred: 0,
+        averageLatency: 0,
+        successRate: 0,
+        failureRate: 0,
+        modelUsageDistribution: [],
+        modelMetrics: [],
+        timeBasedTrends: {
+          daily: [],
+          weekly: [],
+          monthly: [],
+        },
+        performanceMetrics: {
+          totalInputTokens: 0,
+          totalOutputTokens: 0,
+          averageCostPerQuery: 0,
+          averageTokensPerQuery: 0,
+          peakLatency: 0,
+          minLatency: 0,
+        },
+        complexityAnalysis: [],
+      };
+    }
 
-    const totalTokensUsed = allRuns.reduce((sum, run) =>
-      sum + run.inputTokens + run.outputTokens, 0);
-
+    // Calculate totals
+    const totalQueries = allRuns.length;
+    const totalInputTokens = allRuns.reduce((sum, run) => sum + run.inputTokens, 0);
+    const totalOutputTokens = allRuns.reduce((sum, run) => sum + run.outputTokens, 0);
+    const totalTokensUsed = totalInputTokens + totalOutputTokens;
     const totalCostIncurred = allRuns.reduce((sum, run) => sum + run.cost, 0);
+    const totalLatency = allRuns.reduce((sum, run) => sum + run.latencyMs, 0);
+    const averageLatency = totalLatency / totalQueries;
+    const successCount = allRuns.filter(run => run.status === 'completed').length;
+    const successRate = successCount / totalQueries;
+    const failureRate = 1 - successRate;
 
-    const averageLatency = allRuns.length > 0
-      ? allRuns.reduce((sum, run) => sum + run.latencyMs, 0) / allRuns.length
-      : 0;
-
-    const successfulRuns = allRuns.filter(run => run.status === 'completed');
-    const failedRuns = allRuns.filter(run => run.status === 'failed');
-    const successRate = allRuns.length > 0 ? successfulRuns.length / allRuns.length : 0;
-    const failureRate = allRuns.length > 0 ? failedRuns.length / allRuns.length : 0;
-
-    // Model usage distribution
-    const modelUsage = new Map<string, number>();
+    // Group by model
+    const modelGroups = new Map<string, ModelRun[]>();
     allRuns.forEach(run => {
-      modelUsage.set(run.modelId, (modelUsage.get(run.modelId) || 0) + 1);
+      if (!modelGroups.has(run.modelId)) {
+        modelGroups.set(run.modelId, []);
+      }
+      modelGroups.get(run.modelId)!.push(run);
     });
 
-    const modelUsageDistribution = Array.from(modelUsage.entries()).map(([modelId, count]) => {
+    // Calculate model metrics
+    const modelMetrics = Array.from(modelGroups.entries()).map(([modelId, runs]) => {
       const model = getModelById(modelId);
+      const inputTokens = runs.reduce((sum, run) => sum + run.inputTokens, 0);
+      const outputTokens = runs.reduce((sum, run) => sum + run.outputTokens, 0);
+      const avgLatency = runs.reduce((sum, run) => sum + run.latencyMs, 0) / runs.length;
+      const accuracy = runs.reduce((sum, run) => sum + (run.accuracy || 0), 0) / runs.length;
+      const totalCost = runs.reduce((sum, run) => sum + run.cost, 0);
+
       return {
         modelId,
         modelName: model?.name || modelId,
-        queryCount: count,
-        percentage: (count / allRuns.length) * 100,
+        inputTokens,
+        outputTokens,
+        avgLatency,
+        accuracy,
+        totalCost,
         color: model?.color || '#888',
       };
     });
 
-    // Time-based trends (last 30 days)
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-    const dailyData = new Map<string, { queries: number; tokens: number; cost: number; latencies: number[] }>();
-
-    sessions.forEach(session => {
-      session.messages.forEach(message => {
-        if (message.role === 'user') {
-          const dateKey = message.timestamp.toISOString().split('T')[0];
-          if (!dailyData.has(dateKey)) {
-            dailyData.set(dateKey, { queries: 0, tokens: 0, cost: 0, latencies: [] });
-          }
-          const dayData = dailyData.get(dateKey)!;
-          dayData.queries += 1;
-
-          // Find corresponding assistant message with model runs
-          const assistantMessage = session.messages.find(m =>
-            m.role === 'assistant' && m.timestamp > message.timestamp && m.modelRuns
-          );
-
-          if (assistantMessage?.modelRuns) {
-            assistantMessage.modelRuns.forEach(run => {
-              dayData.tokens += run.inputTokens + run.outputTokens;
-              dayData.cost += run.cost;
-              dayData.latencies.push(run.latencyMs);
-            });
-          }
-        }
-      });
+    // Calculate model usage distribution
+    const modelUsageDistribution = Array.from(modelGroups.entries()).map(([modelId, runs]) => {
+      const model = getModelById(modelId);
+      return {
+        modelId,
+        modelName: model?.name || modelId,
+        queryCount: runs.length,
+        percentage: (runs.length / totalQueries) * 100,
+        color: model?.color || '#888',
+      };
     });
 
-    const daily = Array.from(dailyData.entries())
+    // Calculate time-based trends (group by date)
+    const dailyMap = new Map<string, { queries: number; tokens: number; cost: number; latencies: number[] }>();
+
+    allRuns.forEach(run => {
+      const dateKey = run.timestamp.toISOString().split('T')[0];
+      if (!dailyMap.has(dateKey)) {
+        dailyMap.set(dateKey, { queries: 0, tokens: 0, cost: 0, latencies: [] });
+      }
+      const day = dailyMap.get(dateKey)!;
+      day.queries++;
+      day.tokens += run.inputTokens + run.outputTokens;
+      day.cost += run.cost;
+      day.latencies.push(run.latencyMs);
+    });
+
+    const daily = Array.from(dailyMap.entries())
       .map(([date, data]) => ({
         date,
         queries: data.queries,
         tokens: data.tokens,
         cost: data.cost,
-        avgLatency: data.latencies.length > 0
-          ? data.latencies.reduce((sum, l) => sum + l, 0) / data.latencies.length
-          : 0,
+        avgLatency: Math.round(data.latencies.reduce((sum, lat) => sum + lat, 0) / data.latencies.length),
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    // Generate weekly and monthly aggregations
-    const weekly = daily.reduce((weeks: any[], day, index) => {
-      const weekIndex = Math.floor(index / 7);
-      if (!weeks[weekIndex]) {
-        weeks[weekIndex] = {
-          week: `Week ${weekIndex + 1}`,
-          queries: 0,
-          tokens: 0,
-          cost: 0,
-          avgLatency: 0,
-          latencySum: 0,
-          latencyCount: 0,
-        };
-      }
-      weeks[weekIndex].queries += day.queries;
-      weeks[weekIndex].tokens += day.tokens;
-      weeks[weekIndex].cost += day.cost;
-      if (day.avgLatency > 0) {
-        weeks[weekIndex].latencySum += day.avgLatency;
-        weeks[weekIndex].latencyCount += 1;
-      }
-      return weeks;
-    }, []).map(week => ({
-      ...week,
-      avgLatency: week.latencyCount > 0 ? week.latencySum / week.latencyCount : 0,
-    }));
-
-    const monthly = daily.reduce((months: any[], day) => {
-      const monthKey = day.date.substring(0, 7); // YYYY-MM
-      let month = months.find(m => m.month === monthKey);
-      if (!month) {
-        month = {
-          month: monthKey,
-          queries: 0,
-          tokens: 0,
-          cost: 0,
-          avgLatency: 0,
-          latencySum: 0,
-          latencyCount: 0,
-        };
-        months.push(month);
-      }
-      month.queries += day.queries;
-      month.tokens += day.tokens;
-      month.cost += day.cost;
-      if (day.avgLatency > 0) {
-        month.latencySum += day.avgLatency;
-        month.latencyCount += 1;
-      }
-      return months;
-    }, []).map(month => ({
-      ...month,
-      avgLatency: month.latencyCount > 0 ? month.latencySum / month.latencyCount : 0,
-    }));
-
-    const totalInputTokens = allRuns.reduce((sum, run) => sum + run.inputTokens, 0);
-    const totalOutputTokens = allRuns.reduce((sum, run) => sum + run.outputTokens, 0);
-    const averageCostPerQuery = totalQueries > 0 ? totalCostIncurred / totalQueries : 0;
-    const averageTokensPerQuery = totalQueries > 0 ? totalTokensUsed / totalQueries : 0;
-    const peakLatency = allRuns.length > 0 ? Math.max(...allRuns.map(r => r.latencyMs)) : 0;
-    const minLatency = allRuns.length > 0 ? Math.min(...allRuns.map(r => r.latencyMs)) : 0;
-
-    // Merge with mock data for comprehensive view
-    const mergedData: CumulativeAnalytics = {
-      totalQueries: mockData.totalQueries + totalQueries,
-      totalTokensUsed: mockData.totalTokensUsed + totalTokensUsed,
-      totalCostIncurred: mockData.totalCostIncurred + totalCostIncurred,
-      averageLatency: allRuns.length > 0
-        ? (mockData.averageLatency + averageLatency) / 2
-        : mockData.averageLatency,
-      successRate: allRuns.length > 0
-        ? (mockData.successRate + successRate) / 2
-        : mockData.successRate,
-      failureRate: allRuns.length > 0
-        ? (mockData.failureRate + failureRate) / 2
-        : mockData.failureRate,
-      modelUsageDistribution: [
-        ...mockData.modelUsageDistribution.map(model => ({
-          ...model,
-          queryCount: model.queryCount + (modelUsageDistribution.find(m => m.modelId === model.modelId)?.queryCount || 0),
-        })),
-        ...modelUsageDistribution.filter(model =>
-          !mockData.modelUsageDistribution.find(m => m.modelId === model.modelId)
-        ),
-      ].map(model => ({
-        ...model,
-        percentage: (model.queryCount / (mockData.totalQueries + totalQueries)) * 100,
-      })),
+    return {
+      totalQueries,
+      totalTokensUsed,
+      totalCostIncurred,
+      averageLatency,
+      successRate,
+      failureRate,
+      modelUsageDistribution,
+      modelMetrics,
       timeBasedTrends: {
-        daily: mockData.timeBasedTrends.daily.map(mockDay => {
-          const realDay = daily.find(d => d.date === mockDay.date);
-          if (realDay) {
-            return {
-              date: mockDay.date,
-              queries: mockDay.queries + realDay.queries,
-              tokens: mockDay.tokens + realDay.tokens,
-              cost: mockDay.cost + realDay.cost,
-              avgLatency: realDay.avgLatency > 0
-                ? Math.round((mockDay.avgLatency + realDay.avgLatency) / 2)
-                : mockDay.avgLatency,
-            };
-          }
-          return mockDay;
-        }),
-        weekly: [...mockData.timeBasedTrends.weekly, ...weekly].slice(-8), // Keep last 8 weeks
-        monthly: [...mockData.timeBasedTrends.monthly, ...monthly].slice(-12), // Keep last 12 months
+        daily,
+        weekly: [], // Can be calculated if needed
+        monthly: [], // Can be calculated if needed
       },
       performanceMetrics: {
-        totalInputTokens: mockData.performanceMetrics.totalInputTokens + totalInputTokens,
-        totalOutputTokens: mockData.performanceMetrics.totalOutputTokens + totalOutputTokens,
-        averageCostPerQuery: (mockData.performanceMetrics.averageCostPerQuery + averageCostPerQuery) / 2,
-        averageTokensPerQuery: (mockData.performanceMetrics.averageTokensPerQuery + averageTokensPerQuery) / 2,
-        peakLatency: Math.max(mockData.performanceMetrics.peakLatency, peakLatency),
-        minLatency: Math.min(mockData.performanceMetrics.minLatency, minLatency || mockData.performanceMetrics.minLatency),
+        totalInputTokens,
+        totalOutputTokens,
+        averageCostPerQuery: totalCostIncurred / totalQueries,
+        averageTokensPerQuery: totalTokensUsed / totalQueries,
+        peakLatency: Math.max(...allRuns.map(run => run.latencyMs)),
+        minLatency: Math.min(...allRuns.map(run => run.latencyMs)),
       },
-      modelMetrics: [
-        ...mockData.modelMetrics.map(mm => {
-          const realMetrics = allRuns.filter(r => r.modelId === mm.modelId);
-          if (realMetrics.length > 0) {
-            const realInput = realMetrics.reduce((sum, r) => sum + r.inputTokens, 0);
-            const realOutput = realMetrics.reduce((sum, r) => sum + r.outputTokens, 0);
-            const realCost = realMetrics.reduce((sum, r) => sum + r.cost, 0);
-            const realLatency = realMetrics.reduce((sum, r) => sum + r.latencyMs, 0) / realMetrics.length;
-
-            return {
-              ...mm,
-              inputTokens: mm.inputTokens + realInput,
-              outputTokens: mm.outputTokens + realOutput,
-              totalCost: mm.totalCost + realCost,
-              avgLatency: (mm.avgLatency + realLatency) / 2,
-            };
-          }
-          return mm;
-        }),
-        ...Array.from(new Set(allRuns.map(r => r.modelId)))
-          .filter(id => !mockData.modelMetrics.find(m => m.modelId === id))
-          .map(id => {
-            const realMetrics = allRuns.filter(r => r.modelId === id);
-            const model = getModelById(id);
-            return {
-              modelId: id,
-              modelName: model?.name || id,
-              inputTokens: realMetrics.reduce((sum, r) => sum + r.inputTokens, 0),
-              outputTokens: realMetrics.reduce((sum, r) => sum + r.outputTokens, 0),
-              avgLatency: realMetrics.reduce((sum, r) => sum + r.latencyMs, 0) / realMetrics.length,
-              accuracy: 0.95, // Default for new models
-              totalCost: realMetrics.reduce((sum, r) => sum + r.cost, 0),
-              color: model?.color || '#888',
-            };
-          }),
-      ],
+      complexityAnalysis: [],  // Can be calculated from queryCategory if needed
     };
-
-    return mergedData;
   }, [sessions]);
 
   return {
@@ -702,10 +669,13 @@ export function useAIPlatform() {
     cumulativeAnalytics,
     confidence,
     divergence,
+    governanceContext,
+    setGovernanceContext,
     createSession,
     renameSession,
     setCurrentSession,
     executePrompt,
+    executePromptStreaming,
     estimateCost,
     models: AI_MODELS,
   };

@@ -38,7 +38,7 @@ class DBService:
             telemetry = GovernanceTelemetry(
                 message_id=message_id,
                 trace_id=log_data.get("trace_id"),
-                governance_context=log_data.get("tags", {}).get("purpose", "unknown"), # Mapping issue, fixing below
+                governance_context=log_data.get("tags", {}).get("governance_context", "unknown"),
                 host_platform=str(log_data.get("provider")),
                 model_id=log_data.get("model_id"),
                 latency_ms=usage.get("latency_ms", 0.0),
@@ -47,6 +47,8 @@ class DBService:
                 total_cost=cost.get("total_cost", 0.0),
                 accuracy_score=accuracy.get("score", 0.0) if accuracy else 0.0,
                 accuracy_rationale=accuracy.get("rationale") if accuracy else None,
+                query_category=accuracy.get("query_category") if accuracy else None,
+                prompt_optimization=accuracy.get("prompt_optimization") if accuracy else None,
             )
             session.add(telemetry)
             session.commit()
